@@ -38,15 +38,20 @@ estimated from the median cadence. The zero-frequency bin is not returned.
 Normalization
 -------------
 
-``power`` is a one-sided per-bin quantity whose sum equals the variance of the
-input flux. ``power_density`` is ``power / frequency_spacing``, so integrating
-it over frequency also returns the variance. When flux uncertainties are
-provided, inverse-variance weights define both the mean and the variance.
+``power`` is a one-sided per-bin quantity. At the default
+``nyquist_factor=1``, its sum equals the variance of the input flux.
+``power_density`` is ``power / frequency_spacing``, so integrating it through
+Nyquist gives the same result. Truncating the returned band retains only the
+power represented there. Extending above Nyquist returns aliases without using
+them to renormalize, and therefore dilute, the physical one-sided spectrum.
+When flux uncertainties are provided, inverse-variance weights define both the
+mean and the variance.
 
-``amplitude`` is ``sqrt(2 * power)`` and therefore has the same units as the
-input flux. Oversampled bins are correlated, so individual amplitude values
-are not independent Fourier amplitudes when ``oversampling`` is greater than
-one.
+``amplitude`` is ``sqrt(2 * oversampling * power)`` and therefore has the same
+units as the input flux. The oversampling factor compensates for narrower
+frequency bins, keeping the semi-amplitude of a coherent sinusoid stable as the
+grid is refined. Oversampled bins remain correlated and are not independent
+Fourier measurements.
 
 These definitions deliberately replace the dimensionally inconsistent legacy
 amplitude calculation captured by the PBjam compatibility tests.
