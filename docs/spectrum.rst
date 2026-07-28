@@ -56,6 +56,30 @@ Fourier measurements.
 These definitions deliberately replace the dimensionally inconsistent legacy
 amplitude calculation captured by the PBjam compatibility tests.
 
+Spectral window
+---------------
+
+The sampling pattern can be inspected independently of the flux values:
+
+.. code-block:: python
+
+   from mimir import spectral_window
+
+   window = spectral_window(time)
+   print(window.effective_frequency_spacing)
+
+The spectral window is the squared modulus of the discrete Fourier transform
+of unit weights placed at the observation times. It is centred on zero,
+normalized to unit height, and symmetric. Its integral estimates the effective
+spacing between approximately independent frequency bins. For an uninterrupted
+series this approaches ``1 / T``; gaps broaden the window and generally
+increase the effective spacing.
+
+By default, Mimir integrates over 100 nominal frequency spacings on either side
+of zero and samples each nominal spacing ten times. ``half_width`` and
+``oversampling`` can be changed when a more detailed window calculation is
+needed.
+
 API
 ---
 
@@ -63,3 +87,11 @@ API
 
 .. autoclass:: mimir.PowerSpectrum
    :members:
+
+.. autofunction:: mimir.spectral_window
+
+.. autofunction:: mimir.effective_frequency_spacing
+
+.. autoclass:: mimir.SpectralWindow
+   :members:
+
