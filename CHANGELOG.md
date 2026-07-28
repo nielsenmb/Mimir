@@ -1,15 +1,32 @@
 # Changelog
 
-All notable changes to Mimir will be documented in this file.
+All notable changes to Mimir are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and the
-project will use [Semantic Versioning](https://semver.org/).
+project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-28
+
 ### Added
 
-- Initial package structure.
-- Test, lint, build, and documentation configuration.
-- Core dependencies for the future nifty-ls spectrum implementation.
-- Optional Lightkurve dependency group for MAST access.
+- Validated NumPy-based `TimeSeries` containers with masking, cleaning,
+  sorting, uncertainty validation, and cadence metadata.
+- One-sided Lomb–Scargle power spectra calculated directly with nifty-ls.
+- Parseval-normalized power, power density, and sinusoidal semi-amplitude.
+- Spectral-window and effective independent-frequency-spacing calculations.
+- Optional Lightkurve-backed MAST search, download, reduction, and conversion.
+- PBjam 2.0.4 characterisation tests recording the extraction baseline.
+- Test, lint, build, and Sphinx documentation workflows for Python 3.10–3.13.
+
+### Changed
+
+- Corrected the legacy PBjam duty-cycle endpoint convention.
+- Corrected weighted centring and the dimensionally inconsistent legacy
+  amplitude definition.
+- Made spectrum normalization independent of oversampling and requested
+  super-Nyquist extension.
+
+[Unreleased]: https://github.com/nielsenmb/Mimir/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/nielsenmb/Mimir/releases/tag/v0.1.0
