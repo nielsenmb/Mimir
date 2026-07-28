@@ -147,7 +147,6 @@ def test_array_input_requires_flux():
         power_spectrum(np.arange(8.0))
 
 
-
 def _injected_bin(result):
     """Return the grid index nearest the injected frequency."""
     return int(np.argmin(np.abs(result.frequency - 800.0)))
