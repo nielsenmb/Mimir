@@ -22,8 +22,8 @@ class PowerSpectrum:
     frequency : numpy.ndarray
         Positive frequencies on a regular grid.
     power : numpy.ndarray
-        Power in each frequency bin, normalized so that its sum equals the
-        variance of the input flux.
+        Power in each frequency bin, normalized against the physical
+        one-sided band through Nyquist.
     power_density : numpy.ndarray
         Power per unit frequency.
     amplitude : numpy.ndarray
