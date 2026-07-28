@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: >-
+  If you use Mimir in published research, please cite the software using this
+  metadata.
+title: Mimir
+type: software
+authors:
+  - family-names: Nielsen
+    given-names: Martin
+repository-code: https://github.com/nielsenmb/Mimir
+license: MIT
+keywords:
+  - asteroseismology
+  - astronomy
+  - Lomb-Scargle
+  - power spectrum
+  - time series
