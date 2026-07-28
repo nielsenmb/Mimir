@@ -148,6 +148,11 @@ def power_spectrum(
         )
 
     normalization_bins = int(np.floor(nyquist_native / spacing_native))
+    if normalization_bins < 1:
+        raise ValueError(
+            "the physical one-sided frequency band contains no bins; "
+            "increase oversampling or provide a longer time series"
+        )
     evaluated_bins = max(n_bins, normalization_bins)
     raw_power, selected_backend = _nifty_power(
         series,
