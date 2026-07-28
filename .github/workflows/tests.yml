@@ -30,6 +30,19 @@ jobs:
       - name: Test
         run: pytest --cov=mimir --cov-report=term-missing
 
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install compatibility dependencies
+        run: python -m pip install ".[test,compat]"
+      - name: Characterise pbjam.IO
+        run: pytest -m compatibility
+
   build:
     runs-on: ubuntu-latest
     steps:
