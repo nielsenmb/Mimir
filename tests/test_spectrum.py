@@ -198,3 +198,14 @@ def test_under_resolved_frequency_grid_raises_descriptive_error():
             [0.0, 1.0, 0.0],
             frequency_unit="1/d",
         )
+
+
+def test_grid_requires_a_physical_sub_nyquist_bin():
+    """A super-Nyquist-only grid cannot define the Parseval scale."""
+    with pytest.raises(ValueError, match="physical one-sided"):
+        power_spectrum(
+            [0.0, 1.0],
+            [0.0, 1.0],
+            nyquist_factor=4.0,
+            frequency_unit="1/d",
+        )
