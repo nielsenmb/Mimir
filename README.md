@@ -16,6 +16,19 @@ spectrum = power_spectrum(series, oversampling=2)
 print(spectrum.frequency, spectrum.power_density)
 ```
 
+MAST access and basic Lightkurve reduction are available through the optional
+`mast` dependency:
+
+```python
+from mimir import load_lightcurve
+
+series = load_lightcurve(
+    "KIC 8006161",
+    search_kwargs={"mission": "Kepler", "exptime": 60},
+    numax=3500,
+)
+```
+
 ## Design
 
 Mimir separates three responsibilities:
@@ -53,9 +66,8 @@ import mimir
 
 ## Status
 
-Time-series validation, metadata, and nifty-ls power-spectrum calculation are
-implemented. Archive access will be introduced in a subsequent, independently
-tested change.
+Time-series validation, nifty-ls power-spectrum calculation, and optional
+Lightkurve-based MAST access and reduction are implemented.
 
 ## License
 
