@@ -27,8 +27,8 @@ class PowerSpectrum:
     power_density : numpy.ndarray
         Power per unit frequency.
     amplitude : numpy.ndarray
-        Sinusoidal semi-amplitude per bin, defined as
-        ``sqrt(2 * power)``.
+        Sinusoidal semi-amplitude, defined as
+        ``sqrt(2 * oversampling * power)``.
     frequency_spacing : float
         Separation between adjacent frequency bins.
     nyquist_frequency : float
@@ -47,9 +47,9 @@ class PowerSpectrum:
 
     Notes
     -----
-    Oversampled periodogram bins are correlated. Consequently, ``amplitude``
-    describes individual bins and should not be interpreted as a collection of
-    independent Fourier amplitudes when ``oversampling`` is greater than one.
+    Oversampled periodogram bins are correlated. The oversampling factor in the
+    amplitude conversion compensates for the narrower bins, so refining the
+    frequency grid does not dilute a coherent sinusoid's semi-amplitude.
     """
 
     frequency: NDArray[np.float64]
@@ -122,9 +122,11 @@ def power_spectrum(
 
     Notes
     -----
-    Power is rescaled to satisfy Parseval's relation over the evaluated
-    one-sided grid. With uncertainties, the target variance uses inverse
-    variance weights and a weighted mean.
+    Power is rescaled using the physical one-sided band through the Nyquist
+    frequency. At ``nyquist_factor=1``, its sum satisfies Parseval's relation.
+    Truncated spectra contain only the variance represented in the returned
+    band, while super-Nyquist aliases do not dilute the physical spectrum.
+    With uncertainties, inverse-variance weights define the target variance.
     """
     series = _as_time_series(time, flux, flux_err, time_unit, flux_unit)
     oversampling_value = _validate_oversampling(oversampling)
@@ -138,25 +140,32 @@ def power_spectrum(
     nyquist_native = 0.5 / series.cadence
     maximum_native = nyquist_factor_value * nyquist_native
     n_bins = int(np.floor(maximum_native / spacing_native))
-    if n_bins < 1:
+    if n_bins < 2:
         raise ValueError(
-            "the requested frequency range contains no bins; increase "
-            "nyquist_factor or provide a longer time series"
+            "the requested frequency range contains fewer than two bins; "
+            "increase oversampling or nyquist_factor, or provide a longer "
+            "time series"
         )
 
+    normalization_bins = int(np.floor(nyquist_native / spacing_native))
+    evaluated_bins = max(n_bins, normalization_bins)
     raw_power, selected_backend = _nifty_power(
         series,
         spacing_native=spacing_native,
-        n_bins=n_bins,
+        n_bins=evaluated_bins,
         backend=backend,
     )
     target_variance = _flux_variance(series)
-    power = _parseval_power(raw_power, target_variance)
+    power = _parseval_power(
+        raw_power,
+        target_variance,
+        normalization_bins=normalization_bins,
+    )[:n_bins]
 
     frequency_spacing = spacing_native * frequency_scale
     frequency = np.arange(1, n_bins + 1, dtype=float) * frequency_spacing
     power_density = power / frequency_spacing
-    amplitude = np.sqrt(2.0 * power)
+    amplitude = np.sqrt(2.0 * oversampling_value * power)
 
     return PowerSpectrum(
         frequency=frequency,
@@ -280,11 +289,28 @@ def _flux_variance(series: TimeSeries) -> float:
 def _parseval_power(
     raw_power: NDArray[np.float64],
     target_variance: float,
+    *,
+    normalization_bins: int,
 ) -> NDArray[np.float64]:
-    """Scale raw periodogram values so that their sum is the flux variance."""
+    """Scale a periodogram using its physical one-sided frequency band.
+
+    Parameters
+    ----------
+    raw_power : numpy.ndarray
+        Non-negative periodogram values, possibly extending above Nyquist.
+    target_variance : float
+        Flux variance that the bins through Nyquist must reproduce.
+    normalization_bins : int
+        Number of leading bins at or below the Nyquist frequency.
+
+    Returns
+    -------
+    numpy.ndarray
+        Scaled periodogram values.
+    """
     if target_variance == 0.0:
         return np.zeros_like(raw_power)
-    total = float(np.sum(raw_power))
+    total = float(np.sum(raw_power[:normalization_bins]))
     if not np.isfinite(total) or total <= 0.0:
         raise RuntimeError("nifty-ls returned no positive finite power")
     return raw_power * (target_variance / total)
