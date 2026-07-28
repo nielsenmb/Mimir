@@ -2,6 +2,13 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from mimir.mast import (
+    download_lightcurves,
+    lightcurve_to_timeseries,
+    load_lightcurve,
+    reduce_lightcurve,
+    search_lightcurves,
+)
 from mimir.spectrum import PowerSpectrum, power_spectrum
 from mimir.timeseries import TimeSeries
 
@@ -10,4 +17,14 @@ try:
 except PackageNotFoundError:
     __version__ = "0+unknown"
 
-__all__ = ["PowerSpectrum", "TimeSeries", "__version__", "power_spectrum"]
+__all__ = [
+    "PowerSpectrum",
+    "TimeSeries",
+    "__version__",
+    "download_lightcurves",
+    "lightcurve_to_timeseries",
+    "load_lightcurve",
+    "power_spectrum",
+    "reduce_lightcurve",
+    "search_lightcurves",
+]
