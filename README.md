@@ -5,14 +5,15 @@ computing power-density spectra for asteroseismology. It is being extracted
 from `pbjam.IO` so that PBjam, Skuld, Urdr, and other projects can use the same
 well-tested implementation.
 
-The package is currently under development. Its first scientific component is
-the validated `TimeSeries` container:
+The package is currently under development. It provides a validated
+`TimeSeries` container and a Parseval-normalized power-spectrum function:
 
 ```python
-from mimir import TimeSeries
+from mimir import TimeSeries, power_spectrum
 
 series = TimeSeries(time, flux, flux_err, time_unit="d")
-print(series.cadence, series.duration, series.duty_cycle)
+spectrum = power_spectrum(series, oversampling=2)
+print(spectrum.frequency, spectrum.power_density)
 ```
 
 ## Design
@@ -52,9 +53,9 @@ import mimir
 
 ## Status
 
-Time-series validation and metadata are implemented. Power-spectrum
-calculation and archive access will be introduced in subsequent, independently
-tested changes.
+Time-series validation, metadata, and nifty-ls power-spectrum calculation are
+implemented. Archive access will be introduced in a subsequent, independently
+tested change.
 
 ## License
 
