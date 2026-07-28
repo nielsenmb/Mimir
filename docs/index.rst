@@ -14,3 +14,4 @@ reviewed separately.
 
    installation
    development
+   compatibility
