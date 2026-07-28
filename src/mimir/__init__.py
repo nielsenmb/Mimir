@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from mimir.spectrum import PowerSpectrum, power_spectrum
 from mimir.timeseries import TimeSeries
 
 try:
@@ -9,4 +10,4 @@ try:
 except PackageNotFoundError:
     __version__ = "0+unknown"
 
-__all__ = ["TimeSeries", "__version__"]
+__all__ = ["PowerSpectrum", "TimeSeries", "__version__", "power_spectrum"]
