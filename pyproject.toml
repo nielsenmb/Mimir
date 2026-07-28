@@ -20,7 +20,7 @@ keywords = [
     "time-series",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -55,8 +55,9 @@ docs = [
 ]
 
 [project.urls]
-Repository = "https://github.com/nielsenmb/Mimir"
+Changelog = "https://github.com/nielsenmb/Mimir/blob/main/CHANGELOG.md"
 Issues = "https://github.com/nielsenmb/Mimir/issues"
+Repository = "https://github.com/nielsenmb/Mimir"
 
 [tool.setuptools.packages.find]
 where = ["src"]
