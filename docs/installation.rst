@@ -1,14 +1,21 @@
 Installation
 ============
 
-Development installation
-------------------------
+Published releases
+------------------
 
-Install the package and its test dependencies from a checkout:
+Install Mimir from PyPI:
 
 .. code-block:: bash
 
-   python -m pip install -e ".[test]"
+   python -m pip install mimir-astro
+
+The distribution is named ``mimir-astro`` because an unrelated project already
+uses ``mimir`` on PyPI. The Python import remains:
+
+.. code-block:: python
+
+   import mimir
 
 MAST support
 ------------
@@ -17,7 +24,21 @@ Lightkurve-based MAST access is an optional dependency:
 
 .. code-block:: bash
 
-   python -m pip install -e ".[mast]"
+   python -m pip install "mimir-astro[mast]"
 
-The distribution will be published as ``mimir-astro`` while the Python import
-name is ``mimir``.
+Source and development installations
+------------------------------------
+
+Until the first PyPI release, install the latest public source directly:
+
+.. code-block:: bash
+
+   python -m pip install "mimir-astro @ git+https://github.com/nielsenmb/Mimir.git"
+
+For development, clone the repository and install all checking dependencies:
+
+.. code-block:: bash
+
+   git clone https://github.com/nielsenmb/Mimir.git
+   cd Mimir
+   python -m pip install -e ".[test,mast,docs]"

@@ -1,37 +1,43 @@
 PBjam compatibility contract
 ============================
 
-Mimir is being extracted from ``pbjam.IO`` in two distinct phases:
+Mimir was extracted from ``pbjam.IO`` by first recording the behaviour of
+PBjam 2.0.4 and then implementing the corresponding features behind a new,
+validated API. The tests in ``tests/compatibility`` remain characterisation
+tests: they document the migration baseline rather than prescribing Mimir's
+final numerical behaviour.
 
-#. record the behaviour of the existing implementation;
-#. implement the equivalent Mimir feature and compare it with that record.
+Recorded legacy behaviour
+-------------------------
 
-The tests in ``tests/compatibility`` are therefore characterisation tests.
-They describe PBjam 2.0.4 rather than prescribing Mimir's final behaviour.
-This distinction matters because the inherited implementation contains known
-numerical defects. Reproducing a result during extraction and endorsing that
-result scientifically are not the same thing.
-
-Covered behaviour
------------------
-
-The initial contract records:
+The compatibility suite records:
 
 * removal of non-finite and user-masked samples;
 * cadence, duration, sample count, and legacy duty-cycle calculation;
 * the Lomb--Scargle frequency grid and Nyquist truncation;
 * unweighted Parseval normalization for power and power density;
 * recovery of the dominant frequency of a synthetic sinusoid;
-* the present weighted normalization convention;
-* the present amplitude calculation;
-* time-domain window construction and its legacy duplicated padding endpoint;
-  and
+* the legacy weighted normalization and amplitude conventions;
+* time-domain window construction and its duplicated padding endpoint; and
 * mocked Lightkurve search, download, and stitching calls.
 
-The amplitude calculation, the weighted centring convention, and duty cycles
-above one are intentionally captured as legacy behaviour. They will be
-corrected only in the later numerical-audit stage, with explicit regression
-tests and release notes.
+Intentional Mimir differences
+-----------------------------
+
+Mimir does not reproduce known defects merely for compatibility. Its current
+API:
+
+* bounds duty cycles at one;
+* uses inverse-variance-weighted centring when uncertainties are present;
+* reports a dimensionally consistent sinusoidal semi-amplitude;
+* keeps amplitude stable under frequency-grid oversampling;
+* normalizes using the physical one-sided band through Nyquist; and
+* computes the sampling window directly from the Fourier transform of the
+  observation mask.
+
+These differences are covered by Mimir's ordinary regression tests. The
+Astropy high-frequency bias is also not a compatibility target: Mimir calls
+``nifty-ls`` directly.
 
 Running the tests
 -----------------
@@ -43,9 +49,5 @@ The PBjam dependency is isolated in the ``compat`` development extra:
    python -m pip install ".[test,compat]"
    pytest -m compatibility
 
-Ordinary Mimir tests do not require PBjam. Continuous integration runs the
-compatibility suite separately on Python 3.12 so the migration boundary
-remains visible.
-
-The Astropy high-frequency bias is not a compatibility target. Mimir will use
-``nifty-ls`` when the spectrum implementation is introduced.
+Ordinary Mimir installations and tests do not require PBjam. Continuous
+integration runs the compatibility suite separately on Python 3.12.

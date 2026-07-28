@@ -1,87 +1,101 @@
 # Mimir
 
+[![Tests](https://github.com/nielsenmb/Mimir/actions/workflows/tests.yml/badge.svg)](https://github.com/nielsenmb/Mimir/actions/workflows/tests.yml)
+[![Python 3.10–3.13](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://www.python.org/)
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Mimir provides shared tools for preparing astronomical time series and
-computing power-density spectra for asteroseismology. It is being extracted
-from `pbjam.IO` so that PBjam, Skuld, Urdr, and other projects can use the same
-well-tested implementation.
+computing power-density spectra for asteroseismology. It separates numerical
+spectrum calculation from optional archive access so that projects such as
+PBjam, Skuld, and Urdr can use the same tested implementation.
 
-The package is currently under development. It provides a validated
-`TimeSeries` container and a Parseval-normalized power-spectrum function:
+Mimir currently provides:
 
-```python
-from mimir import TimeSeries, power_spectrum
+- validated NumPy-based time-series containers;
+- Lomb–Scargle power spectra calculated directly with
+  [nifty-ls](https://github.com/flatironinstitute/nifty-ls);
+- explicit Parseval normalization, power density, and amplitude;
+- spectral-window and effective independent-frequency-spacing calculations;
+- optional MAST access and basic reduction through Lightkurve.
 
-series = TimeSeries(time, flux, flux_err, time_unit="d")
-spectrum = power_spectrum(series, oversampling=2)
-print(spectrum.frequency, spectrum.power_density)
+## Installation
+
+Install a published release with:
+
+```bash
+python -m pip install mimir-astro
 ```
 
-The sampling window and its effective independent-bin spacing can be computed
-from the same time series:
+MAST support is optional:
+
+```bash
+python -m pip install "mimir-astro[mast]"
+```
+
+The distribution is named `mimir-astro` because an unrelated project already
+uses `mimir` on PyPI. The import name remains:
 
 ```python
-from mimir import spectral_window
+import mimir
+```
 
+Until the first PyPI release, install the latest public source with:
+
+```bash
+python -m pip install "mimir-astro @ git+https://github.com/nielsenmb/Mimir.git"
+```
+
+## Quick start
+
+```python
+from mimir import TimeSeries, power_spectrum, spectral_window
+
+series = TimeSeries(time, flux, flux_err, time_unit="d", flux_unit="ppm")
+spectrum = power_spectrum(series, oversampling=2)
 window = spectral_window(series)
-print(window.frequency, window.power)
+
+print(spectrum.frequency, spectrum.power_density)
 print(window.effective_frequency_spacing)
 ```
 
-MAST access and basic Lightkurve reduction are available through the optional
-`mast` dependency:
+MAST access and basic Lightkurve reduction are available with the `mast`
+extra:
 
 ```python
-from mimir import load_lightcurve
+from mimir import load_lightcurve, power_spectrum
 
 series = load_lightcurve(
     "KIC 8006161",
     search_kwargs={"mission": "Kepler", "exptime": 60},
     numax=3500,
 )
+spectrum = power_spectrum(series)
 ```
 
-## Design
+## Numerical conventions
 
-Mimir separates three responsibilities:
+Power is one-sided and normalized over the physical band through Nyquist. At
+the default `nyquist_factor=1`, the sum of the power equals the input flux
+variance. Power density integrates to the same variance, and amplitude is a
+sinusoidal semi-amplitude with the same units as the input flux. See
+[the spectrum documentation](docs/spectrum.rst) for the complete definitions.
 
-- validation and preparation of time-series data;
-- accurate Lomb–Scargle power-spectrum calculation using
-  [nifty-ls](https://github.com/flatironinstitute/nifty-ls);
-- optional MAST access and light-curve reduction through Lightkurve.
+Mimir uses nifty-ls directly rather than Astropy's standard Lomb–Scargle
+backend. NumPy arrays are the public interchange format; Lightkurve is required
+only for archive access and reduction.
 
-NumPy arrays are the public interchange format. Lightkurve is optional so that
-local spectrum calculations do not require archive-access dependencies.
+## Contributing
 
-## Development installation
+Bug reports, numerical test cases, and focused pull requests are welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and conventions.
+All public functions and classes use NumPy-style docstrings.
 
-Clone the repository and install the development dependencies:
+## Citation
 
-```bash
-python -m pip install -e ".[test,mast,docs]"
-```
-
-Run the checks with:
-
-```bash
-ruff check .
-pytest
-python -m build
-```
-
-The distribution name is `mimir-astro`, because the unrelated name `mimir` is
-already registered on PyPI. The Python import remains:
-
-```python
-import mimir
-```
-
-## Status
-
-Time-series validation, nifty-ls power-spectrum calculation, spectral-window
-analysis, and optional Lightkurve-based MAST access and reduction are
-implemented.
+If Mimir contributes to published research, please cite the software using the
+metadata in [CITATION.cff](CITATION.cff). Release-specific archive information
+can be added after the first public release.
 
 ## License
 
-Mimir is distributed under the MIT License.
-
+Mimir is distributed under the [MIT License](LICENSE).
