@@ -50,7 +50,9 @@ def test_power_and_density_satisfy_parseval_relation():
     assert np.sum(result.power_density) * result.frequency_spacing == (
         pytest.approx(variance, rel=1e-12)
     )
-    assert result.amplitude == pytest.approx(np.sqrt(2.0 * result.power))
+    assert result.amplitude == pytest.approx(
+        np.sqrt(2.0 * result.oversampling * result.power)
+    )
 
 
 def test_weighted_normalization_uses_weighted_mean_and_variance():
@@ -143,3 +145,57 @@ def test_array_input_requires_flux():
     """Raw time samples should not be accepted without flux values."""
     with pytest.raises(TypeError, match="flux is required"):
         power_spectrum(np.arange(8.0))
+
+
+
+def _injected_bin(result):
+    """Return the grid index nearest the injected frequency."""
+    return int(np.argmin(np.abs(result.frequency - 800.0)))
+
+
+def test_amplitude_is_stable_under_oversampling():
+    """Zero-padding should refine the grid without diluting amplitude."""
+    time, flux = _sine_series()
+
+    base = power_spectrum(time, flux)
+    dense = power_spectrum(time, flux, oversampling=4)
+
+    assert dense.amplitude[_injected_bin(dense)] == pytest.approx(
+        base.amplitude[_injected_bin(base)],
+        rel=2e-3,
+    )
+
+
+def test_super_nyquist_bins_do_not_change_physical_band_normalization():
+    """Aliased bins above Nyquist should not dilute the physical spectrum."""
+    time, flux = _sine_series()
+
+    base = power_spectrum(time, flux, oversampling=4)
+    extended = power_spectrum(
+        time,
+        flux,
+        oversampling=4,
+        nyquist_factor=1.5,
+    )
+    base_index = _injected_bin(base)
+    extended_index = _injected_bin(extended)
+
+    assert extended.power_density[extended_index] == pytest.approx(
+        base.power_density[base_index],
+        rel=1e-9,
+    )
+    assert extended.amplitude[extended_index] == pytest.approx(
+        base.amplitude[base_index],
+        rel=1e-9,
+    )
+    assert np.sum(extended.power) > np.var(flux)
+
+
+def test_under_resolved_frequency_grid_raises_descriptive_error():
+    """A grid unsupported by nifty-ls should fail before backend dispatch."""
+    with pytest.raises(ValueError, match="fewer than two bins"):
+        power_spectrum(
+            [0.0, 1.0, 2.0],
+            [0.0, 1.0, 0.0],
+            frequency_unit="1/d",
+        )
