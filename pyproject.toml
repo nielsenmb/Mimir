@@ -46,6 +46,9 @@ test = [
     "pytest-cov>=5",
     "ruff>=0.12",
 ]
+compat = [
+    "pbjam==2.0.4",
+]
 docs = [
     "sphinx>=7",
     "sphinx-rtd-theme>=2",
@@ -61,6 +64,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
+markers = [
+    "compatibility: characterises behaviour inherited from pbjam.IO",
+]
 
 [tool.coverage.run]
 branch = true
