@@ -16,6 +16,17 @@ spectrum = power_spectrum(series, oversampling=2)
 print(spectrum.frequency, spectrum.power_density)
 ```
 
+The sampling window and its effective independent-bin spacing can be computed
+from the same time series:
+
+```python
+from mimir import spectral_window
+
+window = spectral_window(series)
+print(window.frequency, window.power)
+print(window.effective_frequency_spacing)
+```
+
 MAST access and basic Lightkurve reduction are available through the optional
 `mast` dependency:
 
@@ -66,9 +77,11 @@ import mimir
 
 ## Status
 
-Time-series validation, nifty-ls power-spectrum calculation, and optional
-Lightkurve-based MAST access and reduction are implemented.
+Time-series validation, nifty-ls power-spectrum calculation, spectral-window
+analysis, and optional Lightkurve-based MAST access and reduction are
+implemented.
 
 ## License
 
 Mimir is distributed under the MIT License.
+
