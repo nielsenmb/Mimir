@@ -27,6 +27,19 @@ arrays. By default, input times are interpreted as days and returned
 frequencies are in microhertz. Other Astropy-compatible time and frequency
 units can be selected explicitly.
 
+A target identifier can also be supplied directly. Mimir then obtains and
+reduces the light curve through Lightkurve before calculating the spectrum:
+
+.. code-block:: python
+
+   spectrum = power_spectrum(
+       "TIC 307210830",
+       mast_kwargs={"search_kwargs": {"mission": "TESS", "exptime": 120}},
+   )
+
+The same target-name input and ``mast_kwargs`` convention is supported by
+:func:`mimir.spectral_window`.
+
 Frequency grid
 --------------
 

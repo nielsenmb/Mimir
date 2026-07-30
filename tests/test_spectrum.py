@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mimir import PowerSpectrum, TimeSeries, power_spectrum
+from mimir import PowerSpectrum, TimeSeries, inputs, power_spectrum
 
 
 def _sine_series(
@@ -110,6 +110,31 @@ def test_validated_time_series_can_be_reused():
     assert result.flux_unit == "ppm"
     with pytest.raises(TypeError, match="must be omitted"):
         power_spectrum(series, flux)
+
+
+def test_target_name_can_be_used_directly(monkeypatch):
+    """A resolvable target should be accepted by the numerical entry point."""
+    time, flux = _sine_series()
+    expected = TimeSeries(time, flux, time_unit="d", flux_unit="ppm")
+    calls = {}
+
+    def load(target, kwargs):
+        """Record the simulated MAST request."""
+        calls.update(target=target, kwargs=kwargs)
+        return expected
+
+    monkeypatch.setattr(inputs, "_load_mast_target", load)
+
+    result = power_spectrum(
+        "KIC 8006161",
+        mast_kwargs={"search_kwargs": {"mission": "Kepler", "exptime": 60}},
+    )
+
+    assert result.flux_unit == "ppm"
+    assert calls == {
+        "target": "KIC 8006161",
+        "kwargs": {"search_kwargs": {"mission": "Kepler", "exptime": 60}},
+    }
 
 
 def test_constant_flux_returns_zero_spectrum():
