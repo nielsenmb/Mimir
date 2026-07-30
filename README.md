@@ -85,7 +85,8 @@ The [`examples`](examples) directory contains tutorials for:
 - validating local arrays and calculating a normalized power spectrum;
 - downloading and reducing a MAST light curve through Lightkurve; and
 - interpreting spectral windows and effective frequency spacing for gapped
-  observations.
+  observations; and
+- comparing the PBjam and Mimir spectra of the same reduced Kepler target.
 
 The local-array and spectral-window notebooks use deterministic synthetic data
 and run without network access.
