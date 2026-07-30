@@ -10,6 +10,9 @@ The notebooks are intended to be read in order, but each is self-contained:
    interface and the individual Lightkurve-backed archive stages.
 3. [`03_spectral_window.ipynb`](03_spectral_window.ipynb) compares regular and
    gapped sampling and explains effective independent-frequency spacing.
+4. [`04_pbjam_mimir_comparison.ipynb`](04_pbjam_mimir_comparison.ipynb) runs
+   one reduced Kepler light curve through both `pbjam.IO.psd` and Mimir,
+   comparing the frequency grids, normalization, and power-density spectra.
 
 Install Mimir and the plotting dependency with:
 
@@ -18,13 +21,13 @@ python -m pip install \
   "mimir-astro @ git+https://github.com/nielsenmb/Mimir.git" matplotlib
 ```
 
-The MAST notebook also requires the optional archive dependency:
+The MAST and PBjam-comparison notebooks also require optional dependencies:
 
 ```bash
 python -m pip install \
-  "mimir-astro[mast] @ git+https://github.com/nielsenmb/Mimir.git" matplotlib
+  "mimir-astro[mast,compat] @ git+https://github.com/nielsenmb/Mimir.git" matplotlib
 ```
 
-The two synthetic-data notebooks require no network access. The MAST notebook
-downloads data and may take several minutes depending on the selected target
-and products.
+The two synthetic-data notebooks require no network access. The MAST and
+PBjam-comparison notebooks download data and may take several minutes depending
+on the selected target and products.
