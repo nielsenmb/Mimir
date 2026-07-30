@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from operator import index
+from typing import Any
 
 import astropy.units as u
 import nifty_ls
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from mimir.inputs import as_timeseries
 from mimir.timeseries import TimeSeries
 
 
@@ -76,10 +79,11 @@ class PowerSpectrum:
 
 
 def power_spectrum(
-    time: TimeSeries | ArrayLike,
+    time: TimeSeries | str | ArrayLike,
     flux: ArrayLike | None = None,
     flux_err: ArrayLike | None = None,
     *,
+    mast_kwargs: Mapping[str, Any] | None = None,
     oversampling: int = 1,
     nyquist_factor: float = 1.0,
     time_unit: str = "d",
@@ -91,15 +95,20 @@ def power_spectrum(
 
     Parameters
     ----------
-    time : TimeSeries or array-like
-        A validated time series or the sample times. When an array is supplied,
-        ``flux`` is required and the inputs are validated by
-        :class:`mimir.TimeSeries`.
+    time : TimeSeries, str, or array-like
+        A validated time series, a target identifier understood by Lightkurve,
+        or the sample times. A target identifier is downloaded from MAST. When
+        an array is supplied, ``flux`` is required and the inputs are validated
+        by :class:`mimir.TimeSeries`.
     flux : array-like, optional
         Flux measurements. Must be omitted when ``time`` is a ``TimeSeries``.
     flux_err : array-like, optional
         Positive one-sigma flux uncertainties. Must be omitted when ``time`` is
         a ``TimeSeries``.
+    mast_kwargs : mapping, optional
+        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
+        target identifier. Put Lightkurve search constraints in the nested
+        ``search_kwargs`` mapping.
     oversampling : int, default=1
         Number of frequency samples per nominal Fourier spacing, ``1 / T``.
     nyquist_factor : float, default=1.0
@@ -128,7 +137,14 @@ def power_spectrum(
     band, while super-Nyquist aliases do not dilute the physical spectrum.
     With uncertainties, inverse-variance weights define the target variance.
     """
-    series = _as_time_series(time, flux, flux_err, time_unit, flux_unit)
+    series = as_timeseries(
+        time,
+        flux,
+        flux_err,
+        mast_kwargs=mast_kwargs,
+        time_unit=time_unit,
+        flux_unit=flux_unit,
+    )
     oversampling_value = _validate_oversampling(oversampling)
     nyquist_factor_value = _positive_finite("nyquist_factor", nyquist_factor)
     frequency_scale, frequency_unit_label = _frequency_conversion(
@@ -184,31 +200,6 @@ def power_spectrum(
         oversampling=oversampling_value,
         nyquist_factor=nyquist_factor_value,
         backend=selected_backend,
-    )
-
-
-def _as_time_series(
-    time: TimeSeries | ArrayLike,
-    flux: ArrayLike | None,
-    flux_err: ArrayLike | None,
-    time_unit: str,
-    flux_unit: str | None,
-) -> TimeSeries:
-    """Return a validated time series from either supported input form."""
-    if isinstance(time, TimeSeries):
-        if flux is not None or flux_err is not None:
-            raise TypeError(
-                "flux and flux_err must be omitted when time is a TimeSeries"
-            )
-        return time
-    if flux is None:
-        raise TypeError("flux is required when time is an array")
-    return TimeSeries(
-        time=time,
-        flux=flux,
-        flux_err=flux_err,
-        time_unit=time_unit,
-        flux_unit=flux_unit,
     )
 
 

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from operator import index
+from typing import Any
 
 import astropy.units as u
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.integrate import simpson
 
+from mimir.inputs import as_timeseries
 from mimir.timeseries import TimeSeries
 
 
@@ -54,8 +57,9 @@ class SpectralWindow:
 
 
 def spectral_window(
-    time: TimeSeries | ArrayLike,
+    time: TimeSeries | str | ArrayLike,
     *,
+    mast_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
     time_unit: str = "d",
@@ -65,9 +69,15 @@ def spectral_window(
 
     Parameters
     ----------
-    time : TimeSeries or array-like
-        A validated time series or sample times. Array-like values are
-        validated, sorted, and interpreted using ``time_unit``.
+    time : TimeSeries, str, or array-like
+        A validated time series, a target identifier understood by Lightkurve,
+        or sample times. A target identifier is downloaded from MAST.
+        Array-like values are validated, sorted, and interpreted using
+        ``time_unit``.
+    mast_kwargs : mapping, optional
+        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
+        target identifier. Put Lightkurve search constraints in the nested
+        ``search_kwargs`` mapping.
     half_width : float, optional
         Maximum absolute frequency offset in ``frequency_unit``. The default
         is 100 times the nominal spacing, ``1 / T``.
@@ -90,7 +100,7 @@ def spectral_window(
     unit weights at the observation times. Its zero-frequency value is one.
     The effective spacing is the numerical integral of the returned window.
     """
-    series = _as_time_series(time, time_unit)
+    series = _as_time_series(time, time_unit, mast_kwargs)
     oversampling_value = _validate_oversampling(oversampling)
     scale, frequency_unit_label = _frequency_conversion(
         series.time_unit,
@@ -131,8 +141,9 @@ def spectral_window(
 
 
 def effective_frequency_spacing(
-    time: TimeSeries | ArrayLike,
+    time: TimeSeries | str | ArrayLike,
     *,
+    mast_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
     time_unit: str = "d",
@@ -142,8 +153,12 @@ def effective_frequency_spacing(
 
     Parameters
     ----------
-    time : TimeSeries or array-like
-        A validated time series or sample times.
+    time : TimeSeries, str, or array-like
+        A validated time series, a target identifier understood by Lightkurve,
+        or sample times.
+    mast_kwargs : mapping, optional
+        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
+        target identifier.
     half_width : float, optional
         Maximum absolute integration frequency in ``frequency_unit``.
     oversampling : int, default=10
@@ -160,6 +175,7 @@ def effective_frequency_spacing(
     """
     return spectral_window(
         time,
+        mast_kwargs=mast_kwargs,
         half_width=half_width,
         oversampling=oversampling,
         time_unit=time_unit,
@@ -167,17 +183,23 @@ def effective_frequency_spacing(
     ).effective_frequency_spacing
 
 
-def _as_time_series(time: TimeSeries | ArrayLike, time_unit: str) -> TimeSeries:
+def _as_time_series(
+    time: TimeSeries | str | ArrayLike,
+    time_unit: str,
+    mast_kwargs: Mapping[str, Any] | None,
+) -> TimeSeries:
     """Return a validated time series containing the requested sample times."""
-    if isinstance(time, TimeSeries):
-        return time
+    if isinstance(time, (TimeSeries, str)):
+        return as_timeseries(time, mast_kwargs=mast_kwargs)
+    if mast_kwargs is not None:
+        raise TypeError("mast_kwargs can only be used with a target identifier")
     try:
         values = np.asarray(time, dtype=float)
     except (TypeError, ValueError) as error:
         raise TypeError("time must contain numerical values") from error
     if values.ndim != 1:
         raise ValueError("time must be one-dimensional")
-    return TimeSeries(
+    return as_timeseries(
         values,
         np.zeros(values.size, dtype=float),
         time_unit=time_unit,

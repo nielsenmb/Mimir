@@ -15,16 +15,31 @@ Install the optional dependency with:
 Basic use
 ---------
 
+Target identifiers are accepted directly by Mimir's numerical entry points:
+
 .. code-block:: python
 
-   from mimir import load_lightcurve, power_spectrum
+   from mimir import power_spectrum
 
-   series = load_lightcurve(
+   spectrum = power_spectrum(
        "KIC 8006161",
-       search_kwargs={"mission": "Kepler", "exptime": 60},
-       numax=3500,
+       mast_kwargs={
+           "search_kwargs": {"mission": "Kepler", "exptime": 60},
+           "numax": 3500,
+       },
    )
-   spectrum = power_spectrum(series)
+
+If Lightkurve can resolve the name using its defaults, the only required
+argument is the target:
+
+.. code-block:: python
+
+   spectrum = power_spectrum("KIC 8006161")
+
+The :func:`mimir.as_timeseries` wrapper provides the same input handling
+without computing a spectrum. Explicit :func:`mimir.load_lightcurve` calls
+remain available when archive retrieval and numerical calculation should be
+separate.
 
 The convenience loader composes four operations that are also available
 independently:
@@ -58,3 +73,5 @@ API
 .. autofunction:: mimir.lightcurve_to_timeseries
 
 .. autofunction:: mimir.load_lightcurve
+
+.. autofunction:: mimir.as_timeseries

@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from mimir.inputs import as_timeseries
 from mimir.mast import (
     download_lightcurves,
     lightcurve_to_timeseries,
@@ -27,6 +28,7 @@ __all__ = [
     "SpectralWindow",
     "TimeSeries",
     "__version__",
+    "as_timeseries",
     "download_lightcurves",
     "effective_frequency_spacing",
     "lightcurve_to_timeseries",

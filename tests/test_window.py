@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from mimir import TimeSeries, inputs
 from mimir.window import (
     SpectralWindow,
     effective_frequency_spacing,
@@ -64,6 +65,31 @@ def test_window_is_invariant_to_time_translation():
         original.effective_frequency_spacing,
         rel=1e-8,
     )
+
+
+def test_target_name_can_be_used_directly(monkeypatch):
+    """A resolvable target should supply sampling times to the window API."""
+    time = np.arange(256) * 120.0 / 86400.0
+    expected = TimeSeries(time, np.ones(time.size))
+    calls = {}
+
+    def load(target, kwargs):
+        """Record the simulated MAST request."""
+        calls.update(target=target, kwargs=kwargs)
+        return expected
+
+    monkeypatch.setattr(inputs, "_load_mast_target", load)
+
+    result = spectral_window(
+        "TIC 123",
+        mast_kwargs={"search_kwargs": {"mission": "TESS"}},
+    )
+
+    assert result.power[result.n_bins // 2] == pytest.approx(1.0)
+    assert calls == {
+        "target": "TIC 123",
+        "kwargs": {"search_kwargs": {"mission": "TESS"}},
+    }
 
 
 @pytest.mark.parametrize("oversampling", [True, 0, 1.5])

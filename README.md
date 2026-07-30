@@ -62,15 +62,21 @@ MAST access and basic Lightkurve reduction are available with the `mast`
 extra:
 
 ```python
-from mimir import load_lightcurve, power_spectrum
+from mimir import power_spectrum
 
-series = load_lightcurve(
+spectrum = power_spectrum(
     "KIC 8006161",
-    search_kwargs={"mission": "Kepler", "exptime": 60},
-    numax=3500,
+    mast_kwargs={
+        "search_kwargs": {"mission": "Kepler", "exptime": 60},
+        "numax": 3500,
+    },
 )
-spectrum = power_spectrum(series)
 ```
+
+Passing a target name to `power_spectrum`, `spectral_window`, or
+`as_timeseries` uses the same `load_lightcurve` pipeline. Supplying only the
+name uses Lightkurve's defaults; `mast_kwargs` accepts the loader options, with
+Lightkurve search constraints nested under `search_kwargs`.
 
 ## Numerical conventions
 
