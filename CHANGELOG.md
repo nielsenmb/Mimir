@@ -7,6 +7,11 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Direct MAST target-name inputs for time-series, power-spectrum, and
+  spectral-window workflows.
+
 ## [0.1.0] - 2026-07-28
 
 ### Added
