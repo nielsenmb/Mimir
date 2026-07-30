@@ -78,6 +78,18 @@ Passing a target name to `power_spectrum`, `spectral_window`, or
 name uses Lightkurve's defaults; `mast_kwargs` accepts the loader options, with
 Lightkurve search constraints nested under `search_kwargs`.
 
+## Example notebooks
+
+The [`examples`](examples) directory contains tutorials for:
+
+- validating local arrays and calculating a normalized power spectrum;
+- downloading and reducing a MAST light curve through Lightkurve; and
+- interpreting spectral windows and effective frequency spacing for gapped
+  observations.
+
+The local-array and spectral-window notebooks use deterministic synthetic data
+and run without network access.
+
 ## Numerical conventions
 
 Power is one-sided and normalized over the physical band through Nyquist. At
