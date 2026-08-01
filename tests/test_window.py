@@ -81,7 +81,7 @@ def test_target_name_can_be_used_directly(monkeypatch):
     monkeypatch.setattr(inputs, "_load_mast_target", load)
 
     result = spectral_window(
-        "TIC 123",
+        target="TIC 123",
         mast_kwargs={"search_kwargs": {"mission": "TESS"}},
     )
 
@@ -108,3 +108,20 @@ def test_too_narrow_window_is_rejected():
 
     with pytest.raises(ValueError, match="at least one frequency bin"):
         spectral_window(time, half_width=1e-9)
+
+
+def test_time_series_input_is_explicit():
+    """A validated object should enter through the named object argument."""
+    time = np.arange(32, dtype=float)
+    series = TimeSeries(time, np.zeros_like(time))
+
+    result = spectral_window(time_series=series)
+
+    assert result.power[result.n_bins // 2] == pytest.approx(1.0)
+
+
+def test_window_rejects_ambiguous_input_forms():
+    """Only one sampling input form may be selected."""
+    series = TimeSeries([0.0, 1.0], [0.0, 0.0])
+    with pytest.raises(TypeError, match="exactly one input form"):
+        spectral_window([0.0, 1.0], time_series=series)

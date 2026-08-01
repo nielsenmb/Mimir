@@ -22,7 +22,7 @@ Target identifiers are accepted directly by Mimir's numerical entry points:
    from mimir import power_spectrum
 
    spectrum = power_spectrum(
-       "KIC 8006161",
+       target="KIC 8006161",
        mast_kwargs={
            "search_kwargs": {"mission": "Kepler", "exptime": 60},
            "numax": 3500,
@@ -34,9 +34,9 @@ argument is the target:
 
 .. code-block:: python
 
-   spectrum = power_spectrum("KIC 8006161")
+   spectrum = power_spectrum(target="KIC 8006161")
 
-The :func:`mimir.as_timeseries` wrapper provides the same input handling
+The :func:`mimir.as_timeseries` wrapper provides the same explicit input handling
 without computing a spectrum. Explicit :func:`mimir.load_lightcurve` calls
 remain available when archive retrieval and numerical calculation should be
 separate.
