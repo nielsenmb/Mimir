@@ -51,8 +51,8 @@ python -m pip install "mimir-astro @ git+https://github.com/nielsenmb/Mimir.git"
 from mimir import TimeSeries, power_spectrum, spectral_window
 
 series = TimeSeries(time, flux, flux_err, time_unit="d", flux_unit="ppm")
-spectrum = power_spectrum(series, oversampling=2)
-window = spectral_window(series)
+spectrum = power_spectrum(time_series=series, oversampling=2)
+window = spectral_window(time_series=series)
 
 print(spectrum.frequency, spectrum.power_density)
 print(window.effective_frequency_spacing)
@@ -65,7 +65,7 @@ extra:
 from mimir import power_spectrum
 
 spectrum = power_spectrum(
-    "KIC 8006161",
+    target="KIC 8006161",
     mast_kwargs={
         "search_kwargs": {"mission": "Kepler", "exptime": 60},
         "numax": 3500,
@@ -73,9 +73,10 @@ spectrum = power_spectrum(
 )
 ```
 
-Passing a target name to `power_spectrum`, `spectral_window`, or
-`as_timeseries` uses the same `load_lightcurve` pipeline. Supplying only the
-name uses Lightkurve's defaults; `mast_kwargs` accepts the loader options, with
+The numerical entry points expose three distinct input forms: `time` with
+`flux` for arrays, `time_series` for a validated `TimeSeries`, or `target` for
+a MAST-resolvable name. Exactly one form must be selected. Target input uses
+the same `load_lightcurve` pipeline; `mast_kwargs` accepts loader options, with
 Lightkurve search constraints nested under `search_kwargs`.
 
 ## Example notebooks
