@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.integrate import simpson
 
-from mimir.inputs import as_timeseries
+from mimir.inputs import _resolve_timeseries_input
 from mimir.timeseries import TimeSeries
 
 
@@ -57,8 +57,10 @@ class SpectralWindow:
 
 
 def spectral_window(
-    time: TimeSeries | str | ArrayLike,
+    time: ArrayLike | None = None,
     *,
+    time_series: TimeSeries | None = None,
+    target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
@@ -69,14 +71,17 @@ def spectral_window(
 
     Parameters
     ----------
-    time : TimeSeries, str, or array-like
-        A validated time series, a target identifier understood by Lightkurve,
-        or sample times. A target identifier is downloaded from MAST.
-        Array-like values are validated, sorted, and interpreted using
-        ``time_unit``.
+    time : array-like, optional
+        Sample times. Values are validated, sorted, and interpreted using
+        ``time_unit``. Flux values are unnecessary for a sampling window.
+    time_series : TimeSeries, optional
+        Existing validated time series. Values of other types are rejected.
+    target : str, optional
+        Target name or identifier understood by Lightkurve. A target triggers
+        MAST retrieval.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
-        target identifier. Put Lightkurve search constraints in the nested
+        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
+        selected. Put Lightkurve search constraints in the nested
         ``search_kwargs`` mapping.
     half_width : float, optional
         Maximum absolute frequency offset in ``frequency_unit``. The default
@@ -94,13 +99,29 @@ def spectral_window(
         Symmetric frequency offsets, normalized window power, and nominal and
         effective frequency spacings.
 
+    Raises
+    ------
+    TypeError
+        If exactly one of ``time``, ``time_series``, or ``target`` is not
+        selected.
+
     Notes
     -----
     The window is the squared modulus of the discrete Fourier transform of
     unit weights at the observation times. Its zero-frequency value is one.
     The effective spacing is the numerical integral of the returned window.
     """
-    series = _as_time_series(time, time_unit, mast_kwargs)
+    series = _resolve_timeseries_input(
+        time=time,
+        flux=None,
+        flux_err=None,
+        time_series=time_series,
+        target=target,
+        mast_kwargs=mast_kwargs,
+        time_unit=time_unit,
+        flux_unit=None,
+        allow_time_only=True,
+    )
     oversampling_value = _validate_oversampling(oversampling)
     scale, frequency_unit_label = _frequency_conversion(
         series.time_unit,
@@ -141,8 +162,10 @@ def spectral_window(
 
 
 def effective_frequency_spacing(
-    time: TimeSeries | str | ArrayLike,
+    time: ArrayLike | None = None,
     *,
+    time_series: TimeSeries | None = None,
+    target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
@@ -153,12 +176,15 @@ def effective_frequency_spacing(
 
     Parameters
     ----------
-    time : TimeSeries, str, or array-like
-        A validated time series, a target identifier understood by Lightkurve,
-        or sample times.
+    time : array-like, optional
+        Sample times.
+    time_series : TimeSeries, optional
+        Existing validated time series.
+    target : str, optional
+        Target name or identifier understood by Lightkurve.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
-        target identifier.
+        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
+        selected.
     half_width : float, optional
         Maximum absolute integration frequency in ``frequency_unit``.
     oversampling : int, default=10
@@ -174,37 +200,15 @@ def effective_frequency_spacing(
         Integral of the normalized spectral window in ``frequency_unit``.
     """
     return spectral_window(
-        time,
+        time=time,
+        time_series=time_series,
+        target=target,
         mast_kwargs=mast_kwargs,
         half_width=half_width,
         oversampling=oversampling,
         time_unit=time_unit,
         frequency_unit=frequency_unit,
     ).effective_frequency_spacing
-
-
-def _as_time_series(
-    time: TimeSeries | str | ArrayLike,
-    time_unit: str,
-    mast_kwargs: Mapping[str, Any] | None,
-) -> TimeSeries:
-    """Return a validated time series containing the requested sample times."""
-    if isinstance(time, (TimeSeries, str)):
-        return as_timeseries(time, mast_kwargs=mast_kwargs)
-    if mast_kwargs is not None:
-        raise TypeError("mast_kwargs can only be used with a target identifier")
-    try:
-        values = np.asarray(time, dtype=float)
-    except (TypeError, ValueError) as error:
-        raise TypeError("time must contain numerical values") from error
-    if values.ndim != 1:
-        raise ValueError("time must be one-dimensional")
-    return as_timeseries(
-        values,
-        np.zeros(values.size, dtype=float),
-        time_unit=time_unit,
-    )
-
 
 def _sampling_window_power(
     time: NDArray[np.float64],
