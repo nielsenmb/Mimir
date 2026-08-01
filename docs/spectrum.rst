@@ -22,10 +22,14 @@ Basic use
    print(spectrum.frequency)
    print(spectrum.power_density)
 
-An existing :class:`mimir.TimeSeries` can be supplied instead of separate
-arrays. By default, input times are interpreted as days and returned
-frequencies are in microhertz. Other Astropy-compatible time and frequency
-units can be selected explicitly.
+An existing :class:`mimir.TimeSeries` is supplied through the explicit
+``time_series`` argument. By default, input times are interpreted as days and
+returned frequencies are in microhertz. Other Astropy-compatible time and
+frequency units can be selected explicitly.
+
+.. code-block:: python
+
+   spectrum = power_spectrum(time_series=series, oversampling=2)
 
 A target identifier can also be supplied directly. Mimir then obtains and
 reduces the light curve through Lightkurve before calculating the spectrum:
@@ -33,12 +37,13 @@ reduces the light curve through Lightkurve before calculating the spectrum:
 .. code-block:: python
 
    spectrum = power_spectrum(
-       "TIC 307210830",
+       target="TIC 307210830",
        mast_kwargs={"search_kwargs": {"mission": "TESS", "exptime": 120}},
    )
 
-The same target-name input and ``mast_kwargs`` convention is supported by
-:func:`mimir.spectral_window`.
+Exactly one of the three input forms—array ``time`` with ``flux``,
+``time_series``, or ``target``—must be selected. The same explicit convention
+is supported by :func:`mimir.spectral_window`.
 
 Frequency grid
 --------------
@@ -78,7 +83,7 @@ The sampling pattern can be inspected independently of the flux values:
 
    from mimir import spectral_window
 
-   window = spectral_window(time)
+   window = spectral_window(time=time)
    print(window.effective_frequency_spacing)
 
 The spectral window is the squared modulus of the discrete Fourier transform
