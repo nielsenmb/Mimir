@@ -12,6 +12,11 @@ project uses [Semantic Versioning](https://semver.org/).
 - Direct MAST target-name inputs for time-series, power-spectrum, and
   spectral-window workflows.
 
+### Changed
+
+- Split numerical inputs into explicit, mutually exclusive ``time``/``flux``,
+  ``time_series``, and ``target`` arguments.
+
 ## [0.1.0] - 2026-07-28
 
 ### Added
