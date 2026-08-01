@@ -1,41 +1,45 @@
-"""Shared input coercion for Mimir's numerical entry points."""
+"""Shared input resolution for Mimir's numerical entry points."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
 
+import numpy as np
 from numpy.typing import ArrayLike
 
 from mimir.timeseries import TimeSeries
 
 
 def as_timeseries(
-    source: TimeSeries | str | ArrayLike,
+    time: ArrayLike | None = None,
     flux: ArrayLike | None = None,
     flux_err: ArrayLike | None = None,
     *,
+    time_series: TimeSeries | None = None,
+    target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
     time_unit: str = "d",
     flux_unit: str | None = None,
 ) -> TimeSeries:
-    """Return a validated time series from arrays, an object, or a MAST target.
+    """Return a validated time series from one explicit input form.
 
     Parameters
     ----------
-    source : TimeSeries, str, or array-like
-        Existing time series, a target identifier understood by Lightkurve, or
-        sample times. A string triggers MAST retrieval through
-        :func:`mimir.load_lightcurve`.
+    time : array-like, optional
+        Sample times. ``flux`` is required when this input form is selected.
     flux : array-like, optional
-        Flux measurements. Required for array-like ``source`` and omitted for
-        a ``TimeSeries`` or target identifier.
+        Flux measurements corresponding to ``time``.
     flux_err : array-like, optional
-        Positive one-sigma flux uncertainties. Omitted for a ``TimeSeries`` or
-        target identifier.
+        Positive one-sigma flux uncertainties corresponding to ``time``.
+    time_series : TimeSeries, optional
+        Existing validated time series. Values of other types are rejected.
+    target : str, optional
+        Target name or identifier understood by Lightkurve. A target triggers
+        MAST retrieval through :func:`mimir.load_lightcurve`.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``source`` is a
-        target identifier. Lightkurve search options belong in its nested
+        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
+        selected. Lightkurve search options belong in its nested
         ``search_kwargs`` mapping.
     time_unit : str, default="d"
         Unit label for array-like sample times.
@@ -50,39 +54,85 @@ def as_timeseries(
     Raises
     ------
     TypeError
-        If arguments from different input forms are mixed, or array-like input
-        is supplied without flux values.
+        If no input form is selected, more than one input form is selected,
+        or an input has the wrong type.
 
     Examples
     --------
-    A target name alone is sufficient when Lightkurve can resolve it:
+    Reuse an existing validated object explicitly:
 
-    >>> series = as_timeseries("KIC 8006161")
+    >>> series = as_timeseries(time_series=validated_series)
 
-    Search and reduction options retain the existing loader structure:
+    Download a target that Lightkurve can resolve:
+
+    >>> series = as_timeseries(target="KIC 8006161")
+
+    Search and reduction options retain the loader structure:
 
     >>> series = as_timeseries(
-    ...     "KIC 8006161",
+    ...     target="KIC 8006161",
     ...     mast_kwargs={
     ...         "search_kwargs": {"mission": "Kepler", "exptime": 60},
     ...         "numax": 3500,
     ...     },
     ... )
     """
-    if isinstance(source, TimeSeries):
-        _reject_mixed_input(flux, flux_err, mast_kwargs, "a TimeSeries")
-        return source
+    return _resolve_timeseries_input(
+        time=time,
+        flux=flux,
+        flux_err=flux_err,
+        time_series=time_series,
+        target=target,
+        mast_kwargs=mast_kwargs,
+        time_unit=time_unit,
+        flux_unit=flux_unit,
+        allow_time_only=False,
+    )
 
-    if isinstance(source, str):
-        _reject_mixed_input(flux, flux_err, None, "a target identifier")
-        return _load_mast_target(source, mast_kwargs)
+
+def _resolve_timeseries_input(
+    time: ArrayLike | None,
+    flux: ArrayLike | None,
+    flux_err: ArrayLike | None,
+    *,
+    time_series: TimeSeries | None,
+    target: str | None,
+    mast_kwargs: Mapping[str, Any] | None,
+    time_unit: str,
+    flux_unit: str | None,
+    allow_time_only: bool,
+) -> TimeSeries:
+    """Resolve mutually exclusive array, object, and target inputs."""
+    selected = sum(value is not None for value in (time, time_series, target))
+    if selected != 1:
+        raise TypeError(
+            "select exactly one input form: time with flux, time_series, or target"
+        )
+
+    if time_series is not None:
+        if not isinstance(time_series, TimeSeries):
+            raise TypeError("time_series must be a TimeSeries object")
+        _reject_arguments(flux, flux_err, mast_kwargs, "time_series")
+        return time_series
+
+    if target is not None:
+        if not isinstance(target, str):
+            raise TypeError("target must be a string")
+        if not target.strip():
+            raise ValueError("target must not be empty")
+        _reject_arguments(flux, flux_err, None, "target")
+        return _load_mast_target(target, mast_kwargs)
 
     if mast_kwargs is not None:
-        raise TypeError("mast_kwargs can only be used with a target identifier")
+        raise TypeError("mast_kwargs can only be used with target")
     if flux is None:
-        raise TypeError("flux is required when source contains sample times")
+        if not allow_time_only:
+            raise TypeError("flux is required when time is supplied")
+        values = _one_dimensional_time(time)
+        flux = np.zeros(values.size, dtype=float)
+        time = values
     return TimeSeries(
-        time=source,
+        time=time,
         flux=flux,
         flux_err=flux_err,
         time_unit=time_unit,
@@ -90,21 +140,28 @@ def as_timeseries(
     )
 
 
-def _reject_mixed_input(
+def _one_dimensional_time(time: ArrayLike | None) -> np.ndarray:
+    """Return numerical one-dimensional sample times."""
+    try:
+        values = np.asarray(time, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise TypeError("time must contain numerical values") from error
+    if values.ndim != 1:
+        raise ValueError("time must be one-dimensional")
+    return values
+
+
+def _reject_arguments(
     flux: ArrayLike | None,
     flux_err: ArrayLike | None,
     mast_kwargs: Mapping[str, Any] | None,
-    source_description: str,
+    input_name: str,
 ) -> None:
     """Reject arguments that do not apply to the selected input form."""
     if flux is not None or flux_err is not None:
-        raise TypeError(
-            f"flux and flux_err must be omitted when source is {source_description}"
-        )
+        raise TypeError(f"flux and flux_err must be omitted with {input_name}")
     if mast_kwargs is not None:
-        raise TypeError(
-            f"mast_kwargs must be omitted when source is {source_description}"
-        )
+        raise TypeError(f"mast_kwargs must be omitted with {input_name}")
 
 
 def _load_mast_target(
