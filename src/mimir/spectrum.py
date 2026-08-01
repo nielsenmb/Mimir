@@ -79,10 +79,12 @@ class PowerSpectrum:
 
 
 def power_spectrum(
-    time: TimeSeries | str | ArrayLike,
+    time: ArrayLike | None = None,
     flux: ArrayLike | None = None,
     flux_err: ArrayLike | None = None,
     *,
+    time_series: TimeSeries | None = None,
+    target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
     oversampling: int = 1,
     nyquist_factor: float = 1.0,
@@ -95,19 +97,20 @@ def power_spectrum(
 
     Parameters
     ----------
-    time : TimeSeries, str, or array-like
-        A validated time series, a target identifier understood by Lightkurve,
-        or the sample times. A target identifier is downloaded from MAST. When
-        an array is supplied, ``flux`` is required and the inputs are validated
-        by :class:`mimir.TimeSeries`.
+    time : array-like, optional
+        Sample times. ``flux`` is required when this input form is selected.
     flux : array-like, optional
-        Flux measurements. Must be omitted when ``time`` is a ``TimeSeries``.
+        Flux measurements corresponding to ``time``.
     flux_err : array-like, optional
-        Positive one-sigma flux uncertainties. Must be omitted when ``time`` is
-        a ``TimeSeries``.
+        Positive one-sigma flux uncertainties corresponding to ``time``.
+    time_series : TimeSeries, optional
+        Existing validated time series. Values of other types are rejected.
+    target : str, optional
+        Target name or identifier understood by Lightkurve. A target triggers
+        MAST retrieval.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``time`` is a
-        target identifier. Put Lightkurve search constraints in the nested
+        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
+        selected. Put Lightkurve search constraints in the nested
         ``search_kwargs`` mapping.
     oversampling : int, default=1
         Number of frequency samples per nominal Fourier spacing, ``1 / T``.
@@ -129,6 +132,12 @@ def power_spectrum(
         Regular frequencies, power, power density, amplitude, and grid
         metadata.
 
+    Raises
+    ------
+    TypeError
+        If exactly one of array input, ``time_series``, or ``target`` is not
+        selected.
+
     Notes
     -----
     Power is rescaled using the physical one-sided band through the Nyquist
@@ -138,9 +147,11 @@ def power_spectrum(
     With uncertainties, inverse-variance weights define the target variance.
     """
     series = as_timeseries(
-        time,
-        flux,
-        flux_err,
+        time=time,
+        flux=flux,
+        flux_err=flux_err,
+        time_series=time_series,
+        target=target,
         mast_kwargs=mast_kwargs,
         time_unit=time_unit,
         flux_unit=flux_unit,
