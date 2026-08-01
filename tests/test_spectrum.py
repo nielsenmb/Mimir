@@ -105,11 +105,11 @@ def test_validated_time_series_can_be_reused():
     time, flux = _sine_series()
     series = TimeSeries(time, flux, time_unit="d", flux_unit="ppm")
 
-    result = power_spectrum(series)
+    result = power_spectrum(time_series=series)
 
     assert result.flux_unit == "ppm"
     with pytest.raises(TypeError, match="must be omitted"):
-        power_spectrum(series, flux)
+        power_spectrum(flux=flux, time_series=series)
 
 
 def test_target_name_can_be_used_directly(monkeypatch):
@@ -126,7 +126,7 @@ def test_target_name_can_be_used_directly(monkeypatch):
     monkeypatch.setattr(inputs, "_load_mast_target", load)
 
     result = power_spectrum(
-        "KIC 8006161",
+        target="KIC 8006161",
         mast_kwargs={"search_kwargs": {"mission": "Kepler", "exptime": 60}},
     )
 
@@ -170,6 +170,31 @@ def test_array_input_requires_flux():
     """Raw time samples should not be accepted without flux values."""
     with pytest.raises(TypeError, match="flux is required"):
         power_spectrum(np.arange(8.0))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"time": [0.0, 1.0], "flux": [1.0, 2.0], "target": "KIC 1"},
+        {
+            "time_series": TimeSeries([0.0, 1.0], [1.0, 2.0]),
+            "target": "KIC 1",
+        },
+    ],
+)
+def test_exactly_one_spectrum_input_form_is_required(kwargs):
+    """The spectrum API should reject missing and ambiguous input forms."""
+    with pytest.raises(TypeError, match="exactly one input form"):
+        power_spectrum(**kwargs)
+
+
+def test_time_series_and_target_types_are_strict():
+    """Named input forms should reject values of the wrong semantic type."""
+    with pytest.raises(TypeError, match="time_series must be"):
+        power_spectrum(time_series=[0.0, 1.0])
+    with pytest.raises(TypeError, match="target must be"):
+        power_spectrum(target=123)
 
 
 def _injected_bin(result):
