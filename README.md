@@ -20,20 +20,17 @@ Mimir currently provides:
 
 ## Installation
 
-Install a published release with:
+Clone the repo and do:
 
 ```bash
-python -m pip install mimir-astro
+python -m pip install -e .
 ```
-
-MAST support is optional:
+for the light-weight version, or for if you want to include download handling from MAST :
 
 ```bash
-python -m pip install "mimir-astro[mast]"
+python -m pip install -e ".[mast]"
 ```
-
-The distribution is named `mimir-astro` because an unrelated project already
-uses `mimir` on PyPI. The import name remains:
+The import the module:
 
 ```python
 import mimir
