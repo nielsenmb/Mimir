@@ -45,6 +45,20 @@ Exactly one of the three input forms—array ``time`` with ``flux``,
 ``time_series``, or ``target``—must be selected. The same explicit convention
 is supported by :func:`mimir.spectral_window`.
 
+Threading
+---------
+
+By default, nifty-ls chooses how many threads to use. An explicit count can be
+provided when its automatic choice oversubscribes the available physical CPU
+cores:
+
+.. code-block:: python
+
+   spectrum = power_spectrum(time_series=series, nthreads=6)
+
+When several targets are processed concurrently, use ``nthreads=1`` to avoid
+nested parallelism, where every target starts its own pool of worker threads.
+
 Frequency grid
 --------------
 
@@ -112,4 +126,3 @@ API
 
 .. autoclass:: mimir.SpectralWindow
    :members:
-
