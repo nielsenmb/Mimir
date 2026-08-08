@@ -81,6 +81,67 @@ def test_oversampling_and_nyquist_factor_control_grid():
     assert dense.maximum_frequency > dense.nyquist_frequency
 
 
+def test_explicit_frequency_grid_is_returned_exactly_for_different_targets():
+    """A shared explicit grid should be identical for different time series."""
+    time_short, flux_short = _sine_series(sample_count=256)
+    time_long, flux_long = _sine_series(sample_count=640)
+    frequency = np.arange(100.0, 2000.0, 5.0)
+
+    short = power_spectrum(time_short, flux_short, frequency=frequency)
+    long = power_spectrum(time_long, flux_long, frequency=frequency)
+
+    assert np.array_equal(short.frequency, frequency)
+    assert np.array_equal(long.frequency, frequency)
+    assert short.frequency_spacing == pytest.approx(5.0)
+    assert long.frequency_spacing == pytest.approx(5.0)
+    assert short.power.shape == frequency.shape
+    assert long.power.shape == frequency.shape
+
+
+def test_explicit_frequency_grid_recovers_injected_signal():
+    """An explicit grid should evaluate the spectrum at its requested bins."""
+    time, flux = _sine_series()
+    frequency = np.arange(100.0, 2000.0, 2.0)
+
+    result = power_spectrum(time, flux, frequency=frequency)
+
+    assert result.frequency[np.argmax(result.power)] == pytest.approx(800.0)
+    assert result.nyquist_factor == pytest.approx(
+        frequency[-1] / result.nyquist_frequency
+    )
+    assert result.oversampling == pytest.approx(
+        1.0 / (time[-1] * result.frequency_spacing / 1e6 * 86400.0)
+    )
+
+
+@pytest.mark.parametrize(
+    ("frequency", "message"),
+    [
+        ([100.0], "at least two"),
+        ([[100.0, 200.0]], "one-dimensional"),
+        ([0.0, 100.0], "positive and finite"),
+        ([100.0, np.inf], "positive and finite"),
+        ([200.0, 100.0], "strictly increasing"),
+        ([100.0, 200.0, 350.0], "regularly spaced"),
+    ],
+)
+def test_invalid_explicit_frequency_grid_raises(frequency, message):
+    """Explicit grids unsupported by nifty-ls should fail descriptively."""
+    time, flux = _sine_series()
+
+    with pytest.raises(ValueError, match=message):
+        power_spectrum(time, flux, frequency=frequency)
+
+
+@pytest.mark.parametrize("kwargs", [{"oversampling": 2}, {"nyquist_factor": 1.5}])
+def test_explicit_frequency_grid_rejects_automatic_controls(kwargs):
+    """Explicit and automatic frequency-grid controls should not be mixed."""
+    time, flux = _sine_series()
+
+    with pytest.raises(ValueError, match="cannot be changed"):
+        power_spectrum(time, flux, frequency=[100.0, 200.0], **kwargs)
+
+
 def test_frequency_units_are_converted_from_time_units():
     """Equivalent time units should produce identical physical frequencies."""
     time_days, flux = _sine_series()
