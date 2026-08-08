@@ -1,9 +1,12 @@
 """Tests for power-spectrum calculation."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 from mimir import PowerSpectrum, TimeSeries, inputs, power_spectrum
+from mimir import spectrum as spectrum_module
 
 
 def _sine_series(
@@ -156,6 +159,9 @@ def test_constant_flux_returns_zero_spectrum():
         ({"nyquist_factor": 0}, ValueError, "positive finite"),
         ({"nyquist_factor": np.inf}, ValueError, "positive finite"),
         ({"frequency_unit": "m"}, ValueError, "frequency unit"),
+        ({"nthreads": 0}, ValueError, "positive integer or None"),
+        ({"nthreads": 1.5}, TypeError, "positive integer or None"),
+        ({"nthreads": True}, TypeError, "positive integer or None"),
     ],
 )
 def test_invalid_spectrum_parameters_raise(kwargs, exception, message):
@@ -259,3 +265,23 @@ def test_grid_requires_a_physical_sub_nyquist_bin():
             nyquist_factor=4.0,
             frequency_unit="1/d",
         )
+
+
+@pytest.mark.parametrize(("nthreads", "expected"), [(None, None), (3, 3)])
+def test_nthreads_is_forwarded_to_nifty_ls(monkeypatch, nthreads, expected):
+    """An explicit thread count should reach nifty-ls unchanged."""
+    time, flux = _sine_series(sample_count=64)
+    calls = []
+
+    def lombscargle(*args, **kwargs):
+        """Record backend options and return a valid synthetic result."""
+        calls.append(kwargs)
+        return SimpleNamespace(power=np.ones(kwargs["Nf"]), backend="finufft")
+
+    monkeypatch.setattr(spectrum_module.nifty_ls, "lombscargle", lombscargle)
+
+    power_spectrum(time, flux, nthreads=nthreads)
+
+    assert len(calls) == 1
+    assert calls[0].get("nthreads") == expected
+    assert ("nthreads" in calls[0]) is (expected is not None)
