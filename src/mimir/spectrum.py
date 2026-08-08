@@ -41,8 +41,10 @@ class PowerSpectrum:
     flux_unit : str, optional
         Unit label for amplitude. Power and power density carry the
         corresponding squared flux units.
-    oversampling : int
-        Number of frequency samples per nominal Fourier spacing.
+    oversampling : float
+        Effective number of frequency samples per nominal Fourier spacing.
+        This is an integer for automatically generated grids and may be a
+        non-integer for a user-supplied grid.
     nyquist_factor : float
         Requested maximum frequency as a multiple of the Nyquist frequency.
     backend : str
@@ -63,7 +65,7 @@ class PowerSpectrum:
     nyquist_frequency: float
     frequency_unit: str
     flux_unit: str | None
-    oversampling: int
+    oversampling: float
     nyquist_factor: float
     backend: str
 
@@ -86,6 +88,7 @@ def power_spectrum(
     time_series: TimeSeries | None = None,
     target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
+    frequency: ArrayLike | None = None,
     oversampling: int = 1,
     nyquist_factor: float = 1.0,
     time_unit: str = "d",
@@ -112,6 +115,11 @@ def power_spectrum(
         Options passed to :func:`mimir.load_lightcurve` when ``target`` is
         selected. Put Lightkurve search constraints in the nested
         ``search_kwargs`` mapping.
+    frequency : array-like, optional
+        Explicit positive, strictly increasing, regularly spaced frequency
+        grid in ``frequency_unit``. The returned frequencies match these
+        values exactly. When supplied, ``oversampling`` and
+        ``nyquist_factor`` must retain their default values.
     oversampling : int, default=1
         Number of frequency samples per nominal Fourier spacing, ``1 / T``.
     nyquist_factor : float, default=1.0
@@ -137,6 +145,9 @@ def power_spectrum(
     TypeError
         If exactly one of array input, ``time_series``, or ``target`` is not
         selected.
+    ValueError
+        If ``frequency`` is invalid or is combined with automatic-grid
+        controls.
 
     Notes
     -----
@@ -156,51 +167,72 @@ def power_spectrum(
         time_unit=time_unit,
         flux_unit=flux_unit,
     )
-    oversampling_value = _validate_oversampling(oversampling)
-    nyquist_factor_value = _positive_finite("nyquist_factor", nyquist_factor)
     frequency_scale, frequency_unit_label = _frequency_conversion(
         series.time_unit,
         frequency_unit,
     )
-
-    spacing_native = 1.0 / (series.duration * oversampling_value)
     nyquist_native = 0.5 / series.cadence
-    maximum_native = nyquist_factor_value * nyquist_native
-    n_bins = int(np.floor(maximum_native / spacing_native))
-    if n_bins < 2:
-        raise ValueError(
-            "the requested frequency range contains fewer than two bins; "
-            "increase oversampling or nyquist_factor, or provide a longer "
-            "time series"
+    if frequency is None:
+        (
+            output_frequency,
+            spacing_native,
+            oversampling_value,
+            nyquist_factor_value,
+            raw_power,
+            normalization_power,
+            selected_backend,
+        ) = _automatic_grid_power(
+            series,
+            oversampling=oversampling,
+            nyquist_factor=nyquist_factor,
+            frequency_scale=frequency_scale,
+            nyquist_native=nyquist_native,
+            backend=backend,
         )
+    else:
+        if oversampling != 1 or nyquist_factor != 1.0:
+            raise ValueError(
+                "oversampling and nyquist_factor cannot be changed when "
+                "frequency is supplied"
+            )
+        output_frequency, spacing_output = _validate_frequency_grid(frequency)
+        spacing_native = spacing_output / frequency_scale
+        requested_native = output_frequency / frequency_scale
+        oversampling_value = 1.0 / (series.duration * spacing_native)
+        nyquist_factor_value = float(requested_native[-1] / nyquist_native)
+        raw_power, selected_backend = _nifty_power(
+            series,
+            minimum_native=float(requested_native[0]),
+            spacing_native=spacing_native,
+            n_bins=output_frequency.size,
+            backend=backend,
+        )
+        normalization_bins = _normalization_bin_count(
+            nyquist_native,
+            spacing_native,
+        )
+        normalization_power, _ = _nifty_power(
+            series,
+            minimum_native=spacing_native,
+            spacing_native=spacing_native,
+            n_bins=max(2, normalization_bins),
+            backend=backend,
+        )
+        normalization_power = normalization_power[:normalization_bins]
 
-    normalization_bins = int(np.floor(nyquist_native / spacing_native))
-    if normalization_bins < 1:
-        raise ValueError(
-            "the physical one-sided frequency band contains no bins; "
-            "increase oversampling or provide a longer time series"
-        )
-    evaluated_bins = max(n_bins, normalization_bins)
-    raw_power, selected_backend = _nifty_power(
-        series,
-        spacing_native=spacing_native,
-        n_bins=evaluated_bins,
-        backend=backend,
-    )
     target_variance = _flux_variance(series)
     power = _parseval_power(
         raw_power,
         target_variance,
-        normalization_bins=normalization_bins,
-    )[:n_bins]
+        normalization_power=normalization_power,
+    )
 
     frequency_spacing = spacing_native * frequency_scale
-    frequency = np.arange(1, n_bins + 1, dtype=float) * frequency_spacing
     power_density = power / frequency_spacing
     amplitude = np.sqrt(2.0 * oversampling_value * power)
 
     return PowerSpectrum(
-        frequency=frequency,
+        frequency=output_frequency,
         power=power,
         power_density=power_density,
         amplitude=amplitude,
@@ -212,6 +244,90 @@ def power_spectrum(
         nyquist_factor=nyquist_factor_value,
         backend=selected_backend,
     )
+
+
+def _automatic_grid_power(
+    series: TimeSeries,
+    *,
+    oversampling: int,
+    nyquist_factor: float,
+    frequency_scale: float,
+    nyquist_native: float,
+    backend: str,
+) -> tuple[
+    NDArray[np.float64],
+    float,
+    int,
+    float,
+    NDArray[np.float64],
+    NDArray[np.float64],
+    str,
+]:
+    """Evaluate a spectrum on Mimir's automatically generated grid."""
+    oversampling_value = _validate_oversampling(oversampling)
+    nyquist_factor_value = _positive_finite("nyquist_factor", nyquist_factor)
+    spacing_native = 1.0 / (series.duration * oversampling_value)
+    maximum_native = nyquist_factor_value * nyquist_native
+    n_bins = int(np.floor(maximum_native / spacing_native))
+    if n_bins < 2:
+        raise ValueError(
+            "the requested frequency range contains fewer than two bins; "
+            "increase oversampling or nyquist_factor, or provide a longer "
+            "time series"
+        )
+
+    normalization_bins = _normalization_bin_count(nyquist_native, spacing_native)
+    evaluated_bins = max(n_bins, normalization_bins)
+    raw_power, selected_backend = _nifty_power(
+        series,
+        minimum_native=spacing_native,
+        spacing_native=spacing_native,
+        n_bins=evaluated_bins,
+        backend=backend,
+    )
+    frequency_spacing = spacing_native * frequency_scale
+    frequency = np.arange(1, n_bins + 1, dtype=float) * frequency_spacing
+    return (
+        frequency,
+        spacing_native,
+        oversampling_value,
+        nyquist_factor_value,
+        raw_power[:n_bins],
+        raw_power[:normalization_bins],
+        selected_backend,
+    )
+
+
+def _validate_frequency_grid(frequency: ArrayLike) -> tuple[NDArray[np.float64], float]:
+    """Validate and copy a user-supplied regular frequency grid."""
+    try:
+        values = np.asarray(frequency, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise TypeError("frequency must be a one-dimensional numeric array") from error
+    if values.ndim != 1:
+        raise ValueError("frequency must be one-dimensional")
+    if values.size < 2:
+        raise ValueError("frequency must contain at least two values")
+    if not np.all(np.isfinite(values)) or np.any(values <= 0.0):
+        raise ValueError("frequency values must be positive and finite")
+    differences = np.diff(values)
+    if np.any(differences <= 0.0):
+        raise ValueError("frequency values must be strictly increasing")
+    spacing = float(differences[0])
+    if not np.allclose(differences, spacing, rtol=1e-10, atol=0.0):
+        raise ValueError("frequency must be regularly spaced for nifty-ls")
+    return values.copy(), spacing
+
+
+def _normalization_bin_count(nyquist_native: float, spacing_native: float) -> int:
+    """Return the number of regular bins in the physical one-sided band."""
+    normalization_bins = int(np.floor(nyquist_native / spacing_native))
+    if normalization_bins < 1:
+        raise ValueError(
+            "the physical one-sided frequency band contains no bins; use a "
+            "finer frequency grid or provide a longer time series"
+        )
+    return normalization_bins
 
 
 def _validate_oversampling(value: int) -> int:
@@ -260,6 +376,7 @@ def _frequency_conversion(time_unit: str, frequency_unit: str) -> tuple[float, s
 def _nifty_power(
     series: TimeSeries,
     *,
+    minimum_native: float,
     spacing_native: float,
     n_bins: int,
     backend: str,
@@ -269,8 +386,8 @@ def _nifty_power(
         series.time,
         series.flux,
         dy=series.flux_err,
-        fmin=spacing_native,
-        fmax=n_bins * spacing_native,
+        fmin=minimum_native,
+        fmax=minimum_native + (n_bins - 1) * spacing_native,
         Nf=n_bins,
         center_data=True,
         fit_mean=True,
@@ -297,7 +414,7 @@ def _parseval_power(
     raw_power: NDArray[np.float64],
     target_variance: float,
     *,
-    normalization_bins: int,
+    normalization_power: NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Scale a periodogram using its physical one-sided frequency band.
 
@@ -307,8 +424,9 @@ def _parseval_power(
         Non-negative periodogram values, possibly extending above Nyquist.
     target_variance : float
         Flux variance that the bins through Nyquist must reproduce.
-    normalization_bins : int
-        Number of leading bins at or below the Nyquist frequency.
+    normalization_power : numpy.ndarray
+        Periodogram values on a regular grid covering the physical one-sided
+        band through Nyquist.
 
     Returns
     -------
@@ -317,7 +435,7 @@ def _parseval_power(
     """
     if target_variance == 0.0:
         return np.zeros_like(raw_power)
-    total = float(np.sum(raw_power[:normalization_bins]))
+    total = float(np.sum(normalization_power))
     if not np.isfinite(total) or total <= 0.0:
         raise RuntimeError("nifty-ls returned no positive finite power")
     return raw_power * (target_variance / total)

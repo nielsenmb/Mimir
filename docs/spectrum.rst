@@ -53,6 +53,26 @@ validated time series. ``oversampling`` divides that spacing, while
 ``nyquist_factor`` controls the upper limit relative to the Nyquist frequency
 estimated from the median cadence. The zero-frequency bin is not returned.
 
+For analyses that require every target on exactly the same grid, pass a
+positive, increasing, regularly spaced array through ``frequency``. Its values
+are interpreted in ``frequency_unit`` and are returned unchanged:
+
+.. code-block:: python
+
+   shared_frequency = np.arange(10.0, 5000.0, 0.1)  # microhertz
+   spectrum = power_spectrum(
+       time_series=series,
+       frequency=shared_frequency,
+       frequency_unit="uHz",
+   )
+
+An explicit grid cannot be combined with ``oversampling`` or
+``nyquist_factor``. Mimir evaluates the requested bins with nifty-ls and uses a
+separate regular grid through Nyquist to retain the same Parseval normalization
+as an automatically generated spectrum. The ``oversampling`` metadata then
+records the effective grid density, ``1 / (T * frequency_spacing)``, which may
+differ between targets even though their returned frequency arrays are equal.
+
 Normalization
 -------------
 
@@ -112,4 +132,3 @@ API
 
 .. autoclass:: mimir.SpectralWindow
    :members:
-
