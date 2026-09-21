@@ -18,7 +18,7 @@ from mimir.timeseries import TimeSeries
 
 @dataclass(frozen=True)
 class PowerSpectrum:
-    """A one-sided, Parseval-normalized power spectrum.
+    """A one-sided spectrum scaled using a fixed variance reference grid.
 
     Parameters
     ----------
@@ -52,6 +52,10 @@ class PowerSpectrum:
 
     Notes
     -----
+    The reference grid consists of positive multiples of ``1 / duration``
+    through the median-cadence Nyquist estimate. Other output grids retain
+    the same density scale; their integrals need not equal the flux variance.
+
     Oversampled periodogram bins are correlated. The oversampling factor in the
     amplitude conversion compensates for the narrower bins, so refining the
     frequency grid does not dilute a coherent sinusoid's semi-amplitude.
@@ -165,11 +169,14 @@ def power_spectrum(
 
     Notes
     -----
-    Power is rescaled using the physical one-sided band through the Nyquist
-    frequency. At ``nyquist_factor=1``, its sum satisfies Parseval's relation.
-    Truncated spectra contain only the variance represented in the returned
-    band, while super-Nyquist aliases do not dilute the physical spectrum.
-    With uncertainties, inverse-variance weights define the target variance.
+    Density is scaled on a fixed reference grid at positive multiples of
+    ``1 / duration`` through the median-cadence Nyquist estimate. Its integral
+    equals the target variance. Oversampled, explicit, truncated, or extended
+    output grids use that same density scale without being renormalized.
+    Only the default automatic grid (oversampling=1, nyquist_factor=1)
+    necessarily sums to the target variance. With uncertainties, that
+    variance uses inverse-variance weights. This is a normalization convention,
+    not an exact orthogonal Fourier decomposition of irregular observations.
     """
     series = as_timeseries(
         *args,
@@ -228,12 +235,12 @@ def power_spectrum(
         )
         normalization_bins = _normalization_bin_count(
             nyquist_native,
-            spacing_native,
+            1.0 / series.duration,
         )
         normalization_power, _ = _nifty_power(
             series,
-            minimum_native=spacing_native,
-            spacing_native=spacing_native,
+            minimum_native=1.0 / series.duration,
+            spacing_native=1.0 / series.duration,
             n_bins=max(2, normalization_bins),
             backend=backend,
             nthreads=nthreads_value,
@@ -241,14 +248,14 @@ def power_spectrum(
         normalization_power = normalization_power[:normalization_bins]
 
     target_variance = _flux_variance(series)
-    power = _parseval_power(
+    frequency_spacing = spacing_native * frequency_scale
+    power_density = _parseval_density(
         raw_power,
         target_variance,
         normalization_power=normalization_power,
+        reference_spacing=frequency_scale / series.duration,
     )
-
-    frequency_spacing = spacing_native * frequency_scale
-    power_density = power / frequency_spacing
+    power = power_density * frequency_spacing
     amplitude = np.sqrt(2.0 * oversampling_value * power)
 
     return PowerSpectrum(
@@ -284,7 +291,32 @@ def _automatic_grid_power(
     NDArray[np.float64],
     str,
 ]:
-    """Evaluate a spectrum on Mimir's automatically generated grid."""
+    """Evaluate the requested grid and its fixed variance reference.
+
+    Parameters
+    ----------
+    series : TimeSeries
+        Validated measurements.
+    oversampling : int
+        Samples per nominal Fourier interval in the output grid.
+    nyquist_factor : float
+        Output upper limit relative to the median-cadence Nyquist estimate.
+    frequency_scale : float
+        Conversion factor from inverse input time to output frequency units.
+    nyquist_native : float
+        Nyquist estimate in inverse input time units.
+    backend : str
+        nifty-ls backend selection.
+    nthreads : int or None
+        Backend thread count.
+
+    Returns
+    -------
+    tuple
+        Output frequencies, native spacing, oversampling, Nyquist factor,
+        raw output power, raw reference power, and backend name. The default
+        spacing reuses the same evaluation for output and reference bins.
+    """
     oversampling_value = _validate_oversampling(oversampling)
     nyquist_factor_value = _positive_finite("nyquist_factor", nyquist_factor)
     spacing_native = 1.0 / (series.duration * oversampling_value)
@@ -297,8 +329,11 @@ def _automatic_grid_power(
             "time series"
         )
 
-    normalization_bins = _normalization_bin_count(nyquist_native, spacing_native)
-    evaluated_bins = max(n_bins, normalization_bins)
+    reference_spacing = 1.0 / series.duration
+    normalization_bins = _normalization_bin_count(nyquist_native, reference_spacing)
+    evaluated_bins = n_bins
+    if oversampling_value == 1:
+        evaluated_bins = max(n_bins, normalization_bins)
     raw_power, selected_backend = _nifty_power(
         series,
         minimum_native=spacing_native,
@@ -307,6 +342,18 @@ def _automatic_grid_power(
         backend=backend,
         nthreads=nthreads,
     )
+    if oversampling_value == 1:
+        normalization_power = raw_power[:normalization_bins]
+    else:
+        normalization_power, _ = _nifty_power(
+            series,
+            minimum_native=reference_spacing,
+            spacing_native=reference_spacing,
+            n_bins=max(2, normalization_bins),
+            backend=backend,
+            nthreads=nthreads,
+        )
+        normalization_power = normalization_power[:normalization_bins]
     frequency_spacing = spacing_native * frequency_scale
     frequency = np.arange(1, n_bins + 1, dtype=float) * frequency_spacing
     return (
@@ -315,7 +362,7 @@ def _automatic_grid_power(
         oversampling_value,
         nyquist_factor_value,
         raw_power[:n_bins],
-        raw_power[:normalization_bins],
+        normalization_power,
         selected_backend,
     )
 
@@ -342,12 +389,25 @@ def _validate_frequency_grid(frequency: ArrayLike) -> tuple[NDArray[np.float64],
 
 
 def _normalization_bin_count(nyquist_native: float, spacing_native: float) -> int:
-    """Return the number of regular bins in the physical one-sided band."""
+    """Count positive reference bins through the Nyquist estimate.
+
+    Parameters
+    ----------
+    nyquist_native : float
+        Median-cadence Nyquist estimate in inverse input time units.
+    spacing_native : float
+        Fixed reference spacing in the same units.
+
+    Returns
+    -------
+    int
+        Number of reference bins, excluding zero frequency.
+    """
     normalization_bins = int(np.floor(nyquist_native / spacing_native))
     if normalization_bins < 1:
         raise ValueError(
-            "the physical one-sided frequency band contains no bins; use a "
-            "finer frequency grid or provide a longer time series"
+            "the physical one-sided reference band contains no bins; "
+            "provide a longer time series"
         )
     return normalization_bins
 
@@ -450,13 +510,14 @@ def _flux_variance(series: TimeSeries) -> float:
     return float(np.average(np.square(series.flux - mean), weights=weights))
 
 
-def _parseval_power(
+def _parseval_density(
     raw_power: NDArray[np.float64],
     target_variance: float,
     *,
     normalization_power: NDArray[np.float64],
+    reference_spacing: float,
 ) -> NDArray[np.float64]:
-    """Scale a periodogram using its physical one-sided frequency band.
+    """Scale a density using a fixed reference grid independent of output bins.
 
     Parameters
     ----------
@@ -465,17 +526,19 @@ def _parseval_power(
     target_variance : float
         Flux variance that the bins through Nyquist must reproduce.
     normalization_power : numpy.ndarray
-        Periodogram values on a regular grid covering the physical one-sided
-        band through Nyquist.
+        Periodogram values at positive multiples of ``1 / duration`` through
+        the median-cadence Nyquist estimate.
+    reference_spacing : float
+        Reference spacing in the requested output frequency unit.
 
     Returns
     -------
     numpy.ndarray
-        Scaled periodogram values.
+        Density values per requested output frequency unit.
     """
     if target_variance == 0.0:
         return np.zeros_like(raw_power)
-    total = float(np.sum(normalization_power))
+    total = float(np.sum(normalization_power)) * reference_spacing
     if not np.isfinite(total) or total <= 0.0:
         raise RuntimeError("nifty-ls returned no positive finite power")
     return raw_power * (target_variance / total)

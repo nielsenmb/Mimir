@@ -89,22 +89,48 @@ are interpreted in ``frequency_unit`` and are returned unchanged:
 
 An explicit grid cannot be combined with ``oversampling`` or
 ``nyquist_factor``. Mimir evaluates the requested bins with nifty-ls and uses a
-separate regular grid through Nyquist to retain the same Parseval normalization
-as an automatically generated spectrum. The ``oversampling`` metadata then
+fixed reference grid at positive multiples of ``1 / T`` through the
+median-cadence Nyquist estimate, independent of the output spacing or band.
+The ``oversampling`` metadata then
 records the effective grid density, ``1 / (T * frequency_spacing)``, which may
 differ between targets even though their returned frequency arrays are equal.
 
 Normalization
 -------------
 
-``power`` is a one-sided per-bin quantity. At the default
-``nyquist_factor=1``, its sum equals the variance of the input flux.
-``power_density`` is ``power / frequency_spacing``, so integrating it through
-Nyquist gives the same result. Truncating the returned band retains only the
-power represented there. Extending above Nyquist returns aliases without using
-them to renormalize, and therefore dilute, the physical one-sided spectrum.
-When flux uncertainties are provided, inverse-variance weights define both the
-mean and the variance.
+Mimir fixes the density scale using a reference grid whose spacing is
+``df_ref = 1 / T`` and whose frequencies are ``k * df_ref`` for
+``k = 1, ..., floor(f_Nyquist / df_ref)``. Zero frequency is omitted because
+the data are centred. The same reference is used regardless of output-grid
+oversampling, spacing, starting frequency, or upper limit.
+
+If ``R`` is the raw periodogram and ``V`` is the flux variance, the density is
+
+.. math::
+
+   S(f) = R(f)\,\frac{V}{\Delta f_{\rm ref}\sum_k R(k\Delta f_{\rm ref})}.
+
+The default automatic grid (``oversampling=1, nyquist_factor=1``) is the
+reference grid and its integrated density equals ``V`` by construction.
+An oversampled grid estimates the integral numerically, a restricted band
+represents only that band, and a coarse grid may miss narrow peaks. None of
+these returned grids is rescaled to force its integral to equal ``V``.
+``power`` is ``power_density * frequency_spacing`` using the **output**
+spacing, not the reference spacing. Frequencies above the reference band do
+not alter the normalization. With uncertainties, inverse-variance weights
+define both the mean and variance.
+
+This is a fixed variance-normalization convention. ``T`` is the last-minus-
+first retained timestamp, so even for regular observations ``1/T`` is a
+nominal Fourier spacing rather than exactly ``1/(N * cadence)``. For irregular
+or gapped observations, the frequency basis is not orthogonal and the
+median-cadence Nyquist frequency is a heuristic. The convention does not
+establish exact Parseval reconstruction or independent output bins.
+
+The default-spacing calculation reuses one backend evaluation. Oversampled
+and explicit grids require an additional reference evaluation; ``nthreads``
+applies to both. This reference is never made artificially coarse to match
+a coarse requested output grid.
 
 ``amplitude`` is ``sqrt(2 * oversampling * power)`` and therefore has the same
 units as the input flux. The oversampling factor compensates for narrower

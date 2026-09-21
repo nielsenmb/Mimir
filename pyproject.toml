@@ -67,6 +67,7 @@ addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]
 markers = [
     "compatibility: characterises behaviour inherited from pbjam.IO",
+    "mast: exercises actual optional Lightkurve objects without network access",
 ]
 
 [tool.coverage.run]

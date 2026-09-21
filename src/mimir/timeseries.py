@@ -36,6 +36,10 @@ class TimeSeries:
 
     Notes
     -----
+    Masks on NumPy or Astropy input arrays are combined with ``bad_mask``.
+    Masked samples are removed even when ``invalid="raise"``; that setting
+    applies to unmasked, non-finite measurements.
+
     Duplicate timestamps are rejected because Mimir cannot safely choose how
     independent measurements should be combined. Aggregate duplicates before
     constructing the object when that behaviour is appropriate.
@@ -72,6 +76,9 @@ class TimeSeries:
 
         input_size = time_values.size
         mask = _as_bad_mask(bad_mask, input_size)
+        for values in (time, flux, flux_err):
+            if values is not None:
+                mask |= np.ma.getmaskarray(values)
         finite = np.isfinite(time_values) & np.isfinite(flux_values)
         if error_values is not None:
             finite &= np.isfinite(error_values)
