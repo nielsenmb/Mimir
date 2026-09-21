@@ -95,6 +95,7 @@ def power_spectrum(
     flux_unit: str | None = None,
     frequency_unit: str = "uHz",
     backend: str = "auto",
+    nthreads: int | None = None,
 ) -> PowerSpectrum:
     """Compute a one-sided power spectrum with nifty-ls.
 
@@ -133,6 +134,10 @@ def power_spectrum(
         Astropy-compatible unit for returned frequencies.
     backend : str, default="auto"
         Backend passed to :func:`nifty_ls.lombscargle`.
+    nthreads : int, optional
+        Number of threads used by nifty-ls. By default, nifty-ls selects the
+        thread count. Use ``1`` when processing multiple targets in parallel
+        to avoid nested thread pools.
 
     Returns
     -------
@@ -167,6 +172,7 @@ def power_spectrum(
         time_unit=time_unit,
         flux_unit=flux_unit,
     )
+    nthreads_value = _validate_nthreads(nthreads)
     frequency_scale, frequency_unit_label = _frequency_conversion(
         series.time_unit,
         frequency_unit,
@@ -188,6 +194,7 @@ def power_spectrum(
             frequency_scale=frequency_scale,
             nyquist_native=nyquist_native,
             backend=backend,
+            nthreads=nthreads_value,
         )
     else:
         if oversampling != 1 or nyquist_factor != 1.0:
@@ -206,6 +213,7 @@ def power_spectrum(
             spacing_native=spacing_native,
             n_bins=output_frequency.size,
             backend=backend,
+            nthreads=nthreads_value,
         )
         normalization_bins = _normalization_bin_count(
             nyquist_native,
@@ -217,6 +225,7 @@ def power_spectrum(
             spacing_native=spacing_native,
             n_bins=max(2, normalization_bins),
             backend=backend,
+            nthreads=nthreads_value,
         )
         normalization_power = normalization_power[:normalization_bins]
 
@@ -254,6 +263,7 @@ def _automatic_grid_power(
     frequency_scale: float,
     nyquist_native: float,
     backend: str,
+    nthreads: int | None,
 ) -> tuple[
     NDArray[np.float64],
     float,
@@ -284,6 +294,7 @@ def _automatic_grid_power(
         spacing_native=spacing_native,
         n_bins=evaluated_bins,
         backend=backend,
+        nthreads=nthreads,
     )
     frequency_spacing = spacing_native * frequency_scale
     frequency = np.arange(1, n_bins + 1, dtype=float) * frequency_spacing
@@ -343,6 +354,21 @@ def _validate_oversampling(value: int) -> int:
     return result
 
 
+def _validate_nthreads(value: int | None) -> int | None:
+    """Validate and return an optional nifty-ls thread count."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise TypeError("nthreads must be a positive integer or None")
+    try:
+        result = index(value)
+    except TypeError as error:
+        raise TypeError("nthreads must be a positive integer or None") from error
+    if result < 1:
+        raise ValueError("nthreads must be a positive integer or None")
+    return result
+
+
 def _positive_finite(name: str, value: float) -> float:
     """Validate a positive finite scalar."""
     try:
@@ -380,8 +406,10 @@ def _nifty_power(
     spacing_native: float,
     n_bins: int,
     backend: str,
+    nthreads: int | None,
 ) -> tuple[NDArray[np.float64], str]:
     """Evaluate nifty-ls on the requested regular frequency grid."""
+    thread_kwargs = {} if nthreads is None else {"nthreads": nthreads}
     result = nifty_ls.lombscargle(
         series.time,
         series.flux,
@@ -394,6 +422,7 @@ def _nifty_power(
         normalization="psd",
         assume_sorted_t=True,
         backend=backend,
+        **thread_kwargs,
     )
     raw_power = np.asarray(result.power, dtype=float)
     if raw_power.shape != (n_bins,) or not np.all(np.isfinite(raw_power)):
