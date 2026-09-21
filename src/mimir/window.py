@@ -57,11 +57,12 @@ class SpectralWindow:
 
 
 def spectral_window(
+    *args: Any,
     time: ArrayLike | None = None,
-    *,
     time_series: TimeSeries | None = None,
     target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
+    lightcurve_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
     time_unit: str = "d",
@@ -71,6 +72,10 @@ def spectral_window(
 
     Parameters
     ----------
+    *args
+        Target name and optional flat search-filter mapping, for example
+        ``("KIC 8006161", {"mission": "Kepler", "exptime": 60})``.
+        Positional sample arrays remain supported; do not repeat named inputs.
     time : array-like, optional
         Sample times. Values are validated, sorted, and interpreted using
         ``time_unit``. Flux values are unnecessary for a sampling window.
@@ -80,9 +85,13 @@ def spectral_window(
         Target name or identifier understood by Lightkurve. A target triggers
         MAST retrieval.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
-        selected. Put Lightkurve search constraints in the nested
-        ``search_kwargs`` mapping.
+        Flat Lightkurve search filters, such as ``mission``, ``author``,
+        ``exptime``, ``quarter``, or ``sector``. No nesting is required.
+        The legacy nested ``search_kwargs`` form remains supported.
+    lightcurve_kwargs : mapping, optional
+        Download, reduction, and conversion options for
+        :func:`mimir.load_lightcurve`, such as ``download_dir``, ``numax``,
+        ``flatten``, or ``ppm``. Only valid with target input.
     half_width : float, optional
         Maximum absolute frequency offset in ``frequency_unit``. The default
         is 100 times the nominal spacing, ``1 / T``.
@@ -112,12 +121,14 @@ def spectral_window(
     The effective spacing is the numerical integral of the returned window.
     """
     series = _resolve_timeseries_input(
+        *args,
         time=time,
         flux=None,
         flux_err=None,
         time_series=time_series,
         target=target,
         mast_kwargs=mast_kwargs,
+        lightcurve_kwargs=lightcurve_kwargs,
         time_unit=time_unit,
         flux_unit=None,
         allow_time_only=True,
@@ -162,11 +173,12 @@ def spectral_window(
 
 
 def effective_frequency_spacing(
+    *args: Any,
     time: ArrayLike | None = None,
-    *,
     time_series: TimeSeries | None = None,
     target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
+    lightcurve_kwargs: Mapping[str, Any] | None = None,
     half_width: float | None = None,
     oversampling: int = 10,
     time_unit: str = "d",
@@ -176,6 +188,10 @@ def effective_frequency_spacing(
 
     Parameters
     ----------
+    *args
+        Target name and optional flat search-filter mapping, for example
+        ``("KIC 8006161", {"mission": "Kepler", "exptime": 60})``.
+        Positional sample arrays remain supported; do not repeat named inputs.
     time : array-like, optional
         Sample times.
     time_series : TimeSeries, optional
@@ -183,8 +199,13 @@ def effective_frequency_spacing(
     target : str, optional
         Target name or identifier understood by Lightkurve.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
-        selected.
+        Flat Lightkurve search filters, such as ``mission``, ``author``,
+        ``exptime``, ``quarter``, or ``sector``. No nesting is required.
+        The legacy nested ``search_kwargs`` form remains supported.
+    lightcurve_kwargs : mapping, optional
+        Download, reduction, and conversion options for
+        :func:`mimir.load_lightcurve`, such as ``download_dir``, ``numax``,
+        ``flatten``, or ``ppm``. Only valid with target input.
     half_width : float, optional
         Maximum absolute integration frequency in ``frequency_unit``.
     oversampling : int, default=10
@@ -200,10 +221,12 @@ def effective_frequency_spacing(
         Integral of the normalized spectral window in ``frequency_unit``.
     """
     return spectral_window(
+        *args,
         time=time,
         time_series=time_series,
         target=target,
         mast_kwargs=mast_kwargs,
+        lightcurve_kwargs=lightcurve_kwargs,
         half_width=half_width,
         oversampling=oversampling,
         time_unit=time_unit,

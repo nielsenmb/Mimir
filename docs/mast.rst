@@ -15,26 +15,95 @@ Install the optional dependency with:
 Basic use
 ---------
 
-Target identifiers are accepted directly by Mimir's numerical entry points:
+Compute a spectrum using a target and a flat dictionary of search filters:
 
 .. code-block:: python
 
    from mimir import power_spectrum
 
-   spectrum = power_spectrum(
-       target="KIC 8006161",
-       mast_kwargs={
-           "search_kwargs": {"mission": "Kepler", "exptime": 60},
-           "numax": 3500,
-       },
-   )
+   target = "KIC 8006161"
+   mast_kwargs = {"mission": "Kepler", "author": "Kepler", "exptime": 60}
+   spectrum = power_spectrum(target, mast_kwargs)
 
 If Lightkurve can resolve the name using its defaults, the only required
 argument is the target:
 
 .. code-block:: python
 
-   spectrum = power_spectrum(target="KIC 8006161")
+   spectrum = power_spectrum("KIC 8006161")
+
+``mast_kwargs`` contains Lightkurve search filters: ``mission``, ``author``,
+``exptime``, ``quarter``, ``sector``, and other supported search keywords.
+There is no nested ``search_kwargs`` dictionary to construct. Named arguments
+work too: ``power_spectrum(target=target, mast_kwargs=mast_kwargs)``.
+
+The convenience call downloads all matching products. With multiple pipelines
+or cadences available, inspect the list first and constrain the search to the
+products you intend to combine.
+
+Inspect and select products
+---------------------------
+
+Search without downloading any light curves:
+
+.. code-block:: python
+
+   from mimir import search_lightcurves
+
+   products = search_lightcurves(target)
+   print(products)
+   products.table  # Full product metadata; displays as a table in a notebook
+
+This returns Lightkurve's native ``SearchResult``. It includes supported
+high-level science light-curve products, not an inventory of every data type
+stored at MAST. ``author`` selects the data-producing pipeline; omitting it
+allows all authors supported by the search. The same flat filters can be used
+for discovery and calculation:
+
+.. code-block:: python
+
+   products = search_lightcurves(target, mast_kwargs)
+   # Equivalent keyword form:
+   products = search_lightcurves(target, **mast_kwargs)
+
+Inspect the rows and select the desired subset before downloading. For example,
+after deciding that the first row is the product you want:
+
+.. code-block:: python
+
+   from mimir import download_lightcurves, reduce_lightcurve, lightcurve_to_timeseries
+
+   selected = products[:1]  # Choose indices using the displayed metadata
+   collection = download_lightcurves(selected)
+   lightcurve = reduce_lightcurve(collection, numax=3500)
+   series = lightcurve_to_timeseries(lightcurve)
+   spectrum = power_spectrum(time_series=series)
+
+Further details on search filters and result selection are in the
+`Lightkurve search documentation <https://lightkurve.github.io/lightkurve/reference/api/lightkurve.search_lightcurve.html>`_.
+
+Download and reduction options
+------------------------------
+
+For optional processing settings, use ``lightcurve_kwargs``:
+
+.. code-block:: python
+
+   spectrum = power_spectrum(
+       target,
+       mast_kwargs,
+       lightcurve_kwargs={"numax": 3500, "outlier_sigma": 5.0},
+   )
+
+These are the download, reduction, and conversion settings accepted by
+:func:`mimir.load_lightcurve`, such as ``download_dir``, ``flatten``, and
+``ppm``. Lightkurve's named ``exptime`` selectors (``"short"``, ``"long"``, and
+``"fast"``) are search filters; Mimir infers the numerical cadence from the
+downloaded light curve when one of those selectors is used.
+
+Existing nested ``mast_kwargs={"search_kwargs": {...}, "numax": ...}`` calls
+remain supported. New code can use the flat form. Supplying the same option
+through two mappings raises an error instead of silently overriding it.
 
 The :func:`mimir.as_timeseries` wrapper provides the same explicit input handling
 without computing a spectrum. Explicit :func:`mimir.load_lightcurve` calls

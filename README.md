@@ -67,22 +67,39 @@ MAST access and basic Lightkurve reduction are available with the `mast`
 extra:
 
 ```python
-from mimir import power_spectrum
+from mimir import power_spectrum, search_lightcurves
 
-spectrum = power_spectrum(
-    target="KIC 8006161",
-    mast_kwargs={
-        "search_kwargs": {"mission": "Kepler", "exptime": 60},
-        "numax": 3500,
-    },
-)
+target = "KIC 8006161"
+mast_kwargs = {"mission": "Kepler", "author": "Kepler", "exptime": 60}
+spectrum = power_spectrum(target, mast_kwargs)
 ```
 
-The numerical entry points expose three distinct input forms: `time` with
-`flux` for arrays, `time_series` for a validated `TimeSeries`, or `target` for
-a MAST-resolvable name. Exactly one form must be selected. Target input uses
-the same `load_lightcurve` pipeline; `mast_kwargs` accepts loader options, with
-Lightkurve search constraints nested under `search_kwargs`.
+To inspect available light-curve products before downloading anything:
+
+```python
+products = search_lightcurves(target)
+print(products)  # Available authors/pipelines, observing segments, and exposure times
+products.table  # Full metadata in a notebook
+```
+
+`search_lightcurves` searches the products supported by Lightkurve, including
+supported high-level science light curves. Use its returned metadata to choose
+filters such as `author`, `mission`, `exptime`, `quarter`, or `sector`. The
+quick PSD call downloads all matching products; choose a consistent pipeline
+and cadence when different products cover the same observations. The
+[MAST guide](docs/mast.rst) also shows how to select individual result rows.
+
+`mast_kwargs` is a **flat dictionary of search filters**. Optional reduction
+settings are separate:
+
+```python
+spectrum = power_spectrum(target, mast_kwargs, lightcurve_kwargs={"numax": 3500})
+```
+
+Named `target=`, `time=`/`flux=`, and `time_series=` inputs remain available and
+mutually exclusive. Positional arrays remain supported. Earlier nested
+`mast_kwargs={"search_kwargs": {...}, "numax": ...}` calls still work, but are
+not needed for new code.
 
 ## Example notebooks
 

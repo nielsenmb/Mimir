@@ -9,6 +9,10 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Concise target calls such as `power_spectrum(target, mast_kwargs)` with flat
+  Lightkurve search filters and separate optional `lightcurve_kwargs`.
+- Flat filter mappings for `search_lightcurves`, with documented product
+  inspection and selection before downloading.
 - Direct MAST target-name inputs for time-series, power-spectrum, and
   spectral-window workflows.
 - Explicit, regularly spaced frequency grids for power-spectrum calculation,
@@ -16,8 +20,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Retained positional arrays, distinct named input forms, and legacy nested
+  MAST options while simplifying the target workflow.
 - Split numerical inputs into explicit, mutually exclusive ``time``/``flux``,
   ``time_series``, and ``target`` arguments.
+
+### Fixed
+
+- Named Lightkurve exposure selectors (`short`, `long`, `fast`) no longer enter
+  numerical exposure-time validation during default reduction.
 
 ## [0.1.0] - 2026-07-28
 
