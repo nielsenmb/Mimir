@@ -81,13 +81,14 @@ class PowerSpectrum:
 
 
 def power_spectrum(
+    *args: Any,
     time: ArrayLike | None = None,
     flux: ArrayLike | None = None,
     flux_err: ArrayLike | None = None,
-    *,
     time_series: TimeSeries | None = None,
     target: str | None = None,
     mast_kwargs: Mapping[str, Any] | None = None,
+    lightcurve_kwargs: Mapping[str, Any] | None = None,
     frequency: ArrayLike | None = None,
     oversampling: int = 1,
     nyquist_factor: float = 1.0,
@@ -101,6 +102,10 @@ def power_spectrum(
 
     Parameters
     ----------
+    *args
+        Target name and optional flat search-filter mapping, for example
+        ``("KIC 8006161", {"mission": "Kepler", "exptime": 60})``.
+        Positional sample arrays remain supported; do not repeat named inputs.
     time : array-like, optional
         Sample times. ``flux`` is required when this input form is selected.
     flux : array-like, optional
@@ -113,9 +118,13 @@ def power_spectrum(
         Target name or identifier understood by Lightkurve. A target triggers
         MAST retrieval.
     mast_kwargs : mapping, optional
-        Options passed to :func:`mimir.load_lightcurve` when ``target`` is
-        selected. Put Lightkurve search constraints in the nested
-        ``search_kwargs`` mapping.
+        Flat Lightkurve search filters, such as ``mission``, ``author``,
+        ``exptime``, ``quarter``, or ``sector``. No nesting is required.
+        The legacy nested ``search_kwargs`` form remains supported.
+    lightcurve_kwargs : mapping, optional
+        Download, reduction, and conversion options for
+        :func:`mimir.load_lightcurve`, such as ``download_dir``, ``numax``,
+        ``flatten``, or ``ppm``. Only valid with target input.
     frequency : array-like, optional
         Explicit positive, strictly increasing, regularly spaced frequency
         grid in ``frequency_unit``. The returned frequencies match these
@@ -163,12 +172,14 @@ def power_spectrum(
     With uncertainties, inverse-variance weights define the target variance.
     """
     series = as_timeseries(
+        *args,
         time=time,
         flux=flux,
         flux_err=flux_err,
         time_series=time_series,
         target=target,
         mast_kwargs=mast_kwargs,
+        lightcurve_kwargs=lightcurve_kwargs,
         time_unit=time_unit,
         flux_unit=flux_unit,
     )

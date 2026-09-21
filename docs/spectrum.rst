@@ -37,13 +37,20 @@ reduces the light curve through Lightkurve before calculating the spectrum:
 .. code-block:: python
 
    spectrum = power_spectrum(
-       target="TIC 307210830",
-       mast_kwargs={"search_kwargs": {"mission": "TESS", "exptime": 120}},
+       "TIC 307210830",
+       {"mission": "TESS", "author": "SPOC", "exptime": 120},
    )
 
 Exactly one of the three input forms—array ``time`` with ``flux``,
 ``time_series``, or ``target``—must be selected. The same explicit convention
 is supported by :func:`mimir.spectral_window`.
+
+The target and flat ``mast_kwargs`` mapping may be positional, as shown above,
+or named. Search filters go directly in ``mast_kwargs``. Optional download,
+reduction, and conversion settings go in ``lightcurve_kwargs``, for example
+``lightcurve_kwargs={"numax": 3500, "flatten": False}``. Legacy nested search
+options are still accepted. Use :func:`mimir.search_lightcurves` to inspect
+available products before downloading; see :doc:`mast` for the full workflow.
 
 Threading
 ---------

@@ -6,7 +6,9 @@ that Lightkurve remains an optional dependency.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from importlib import import_module
+from numbers import Real
 from operator import index
 from os import PathLike
 from typing import Any
@@ -16,14 +18,21 @@ import numpy as np
 from mimir.timeseries import TimeSeries
 
 
-def search_lightcurves(target: str, **search_kwargs: Any) -> Any:
-    """Search MAST for light curves using Lightkurve.
+def search_lightcurves(
+    target: str,
+    mast_kwargs: Mapping[str, Any] | None = None,
+    **search_kwargs: Any,
+) -> Any:
+    """List available light-curve products without downloading them.
 
     Parameters
     ----------
     target : str
         Target identifier understood by
         :func:`lightkurve.search_lightcurve`.
+    mast_kwargs : mapping, optional
+        Flat search filters, as used by :func:`mimir.power_spectrum`.
+        Filters can alternatively be supplied as keyword arguments.
     **search_kwargs
         Additional search constraints, such as ``mission``, ``author``, or
         ``exptime``.
@@ -31,7 +40,9 @@ def search_lightcurves(target: str, **search_kwargs: Any) -> Any:
     Returns
     -------
     lightkurve.SearchResult
-        Non-empty Lightkurve search result.
+        Non-empty, displayable and sliceable product list. Use ``print(result)``
+        to inspect it or ``result.table`` for its full metadata table. Only
+        light-curve products supported by Lightkurve are searched.
 
     Raises
     ------
@@ -41,12 +52,28 @@ def search_lightcurves(target: str, **search_kwargs: Any) -> Any:
         If the search returns no matching light curves.
     ValueError
         If ``target`` is not a non-empty string.
+    TypeError
+        If the mapping is invalid or a filter is supplied twice.
+
+    Examples
+    --------
+    Inspect products before selecting a pipeline and cadence:
+
+    >>> products = search_lightcurves("TIC 307210830", {"mission": "TESS"})
+    >>> print(products)
+    >>> selected = products[:1]
     """
     if not isinstance(target, str) or not target.strip():
         raise ValueError("target must be a non-empty string")
 
+    from mimir.inputs import _options_mapping
+
+    filters = _options_mapping("mast_kwargs", mast_kwargs)
+    if duplicate := filters.keys() & search_kwargs.keys():
+        raise TypeError(f"duplicate search filters: {', '.join(sorted(duplicate))}")
+    filters.update(search_kwargs)
     lightkurve = _import_lightkurve()
-    result = lightkurve.search_lightcurve(target, **search_kwargs)
+    result = lightkurve.search_lightcurve(target, **filters)
     if _is_empty(result):
         raise LookupError(f"no light curves found for {target!r}")
     return result
@@ -272,7 +299,7 @@ def load_lightcurve(
         Downloaded and validated Mimir time series.
     """
     kwargs = {} if search_kwargs is None else dict(search_kwargs)
-    if exposure_time is None and "exptime" in kwargs:
+    if exposure_time is None and isinstance(kwargs.get("exptime"), Real):
         exposure_time = kwargs["exptime"]
     result = search_lightcurves(target, **kwargs)
     collection = download_lightcurves(result, download_dir=download_dir)
