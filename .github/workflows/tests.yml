@@ -30,6 +30,19 @@ jobs:
       - name: Test
         run: pytest --cov=mimir --cov-report=term-missing
 
+  mast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Lightkurve test dependencies
+        run: python -m pip install ".[test,mast]"
+      - name: Test real Lightkurve interoperability without archive requests
+        run: pytest -m mast
+
   compatibility:
     runs-on: ubuntu-latest
     steps:

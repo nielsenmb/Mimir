@@ -27,6 +27,15 @@ project uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Fixed PSD density normalization to use a reference grid independent of
+  output spacing, oversampling, and frequency range. Only the default automatic
+  reference grid is required to integrate exactly to the chosen variance.
+- Preserve NumPy and Astropy masks in array, sampling-window, and Lightkurve
+  inputs; exclude masked samples before estimating the ppm normalization.
+- Convert Lightkurve time coordinates and cadence using Astropy time arithmetic
+  and physical units, independent of JD, mission, Unix, or calendar display
+  formats. Absolute times now use elapsed time since JD 2451545.0 in the input
+  scale; unitless numeric columns remain interpreted as days.
 - Named Lightkurve exposure selectors (`short`, `long`, `fast`) no longer enter
   numerical exposure-time validation during default reduction.
 

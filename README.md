@@ -116,10 +116,13 @@ and run without network access.
 
 ## Numerical conventions
 
-Power is one-sided and normalized over the physical band through Nyquist. At
-the default `nyquist_factor=1`, the sum of the power equals the input flux
-variance. Power density integrates to the same variance, and amplitude is a
-sinusoidal semi-amplitude with the same units as the input flux. See
+Power density uses a fixed reference grid at positive multiples of `1 / duration`
+through the median-cadence Nyquist estimate. The default automatic grid
+(`oversampling=1`, `nyquist_factor=1`) integrates to the input flux variance;
+other output grids retain the same density scale without forcing that equality.
+Input masks are preserved, and Lightkurve `Time` columns are converted to elapsed
+time since JD 2451545.0 in the input time scale. Array inputs retain their supplied
+coordinates and explicit unit labels. See
 [the spectrum documentation](docs/spectrum.rst) for the complete definitions.
 
 Mimir uses nifty-ls directly rather than Astropy's standard Lomb–Scargle

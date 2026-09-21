@@ -13,7 +13,9 @@ from operator import index
 from os import PathLike
 from typing import Any
 
+import astropy.units as u
 import numpy as np
+from astropy.time import Time, TimeDelta
 
 from mimir.timeseries import TimeSeries
 
@@ -211,7 +213,10 @@ def lightcurve_to_timeseries(
         Convert flux to relative parts per million using its finite median.
         Flux uncertainties are scaled by the same factor.
     time_unit : str, default="d"
-        Unit label for the extracted time values.
+        Output time unit. Astropy Time values become elapsed times since
+        JD 2451545.0 in the input time scale, independent of display format.
+        TimeDelta and Quantity values are converted directly. Unitless
+        numerical columns are assumed to contain days.
 
     Returns
     -------
@@ -228,31 +233,25 @@ def lightcurve_to_timeseries(
     if not hasattr(light_curve, "time") or not hasattr(light_curve, "flux"):
         raise TypeError("light_curve must provide time and flux columns")
 
-    time = _column_values(light_curve.time)
+    time = _time_values(light_curve.time, time_unit)
     flux = _column_values(light_curve.flux)
     flux_err_column = getattr(light_curve, "flux_err", None)
     flux_err = (
         None if flux_err_column is None else _column_values(flux_err_column)
     )
 
-    flux_unit = None
+    series = TimeSeries(time, flux, flux_err, time_unit=time_unit)
     if ppm:
-        median = float(np.nanmedian(flux))
+        median = float(np.median(series.flux))
         if not np.isfinite(median) or median == 0.0:
             raise ValueError("cannot convert a zero or non-finite median flux to ppm")
         scale = 1e6 / abs(median)
-        flux = (flux / median - 1.0) * 1e6
-        if flux_err is not None:
-            flux_err = flux_err * scale
-        flux_unit = "ppm"
+        series.flux = (series.flux / median - 1.0) * 1e6
+        if series.flux_err is not None:
+            series.flux_err = series.flux_err * scale
+        series.flux_unit = "ppm"
 
-    return TimeSeries(
-        time,
-        flux,
-        flux_err,
-        time_unit=time_unit,
-        flux_unit=flux_unit,
-    )
+    return series
 
 
 def load_lightcurve(
@@ -398,7 +397,18 @@ def _pbjam_window_length(
 
 
 def _infer_exposure_time(light_curve: Any) -> float:
-    """Infer exposure time in seconds from metadata or time samples."""
+    """Infer exposure time from metadata or physically converted time samples.
+
+    Parameters
+    ----------
+    light_curve : lightkurve.LightCurve
+        Observations with optional EXPTIME (seconds) or TIMEDEL (days) metadata.
+
+    Returns
+    -------
+    float
+        Exposure time in seconds, falling back to the median retained cadence.
+    """
     meta = getattr(light_curve, "meta", {}) or {}
     if "EXPTIME" in meta:
         return _positive_finite("EXPTIME", meta["EXPTIME"])
@@ -409,21 +419,65 @@ def _infer_exposure_time(light_curve: Any) -> float:
         raise ValueError(
             "exposure_time is required when it cannot be inferred from the light curve"
         )
-    time = _column_values(light_curve.time)
+    time = _time_values(light_curve.time, "s")
     finite = np.sort(time[np.isfinite(time)])
     if finite.size < 2:
         raise ValueError(
             "exposure_time is required when it cannot be inferred from the light curve"
         )
-    return _positive_finite("inferred exposure_time", np.median(np.diff(finite))) * (
-        86400.0
-    )
+    return _positive_finite("inferred exposure_time", np.median(np.diff(finite)))
+
+
+def _time_values(column: Any, time_unit: str) -> np.ndarray:
+    """Convert time coordinates without using their display representation.
+
+    Parameters
+    ----------
+    column : Time, TimeDelta, Quantity, or array-like
+        Time coordinates. Unitless numerical columns are interpreted as days.
+    time_unit : str
+        Astropy-compatible output time unit.
+
+    Returns
+    -------
+    numpy.ndarray
+        Times in the requested unit, with masked samples replaced by NaN.
+        Absolute times use JD 2451545.0 in the input scale as their origin;
+        subtraction retains Astropy's precision before float conversion.
+
+    Raises
+    ------
+    ValueError
+        If the output unit is not a time unit.
+    """
+    unit = u.Unit(time_unit)
+    if not unit.is_equivalent(u.s):
+        raise ValueError("time_unit must be an Astropy-compatible time unit")
+    if isinstance(column, Time):
+        origin = Time(2451545.0, format="jd", scale=column.scale)
+        return _column_values((column - origin).to_value(unit))
+    if isinstance(column, (TimeDelta, u.Quantity)):
+        return _column_values(column.to_value(unit))
+    return _column_values(column) * u.d.to(unit)
 
 
 def _column_values(column: Any) -> np.ndarray:
-    """Return floating-point NumPy values from a Lightkurve column."""
+    """Extract values while keeping masked samples excluded.
+
+    Parameters
+    ----------
+    column : array-like
+        Numerical column, optionally carrying a NumPy or Astropy mask.
+
+    Returns
+    -------
+    numpy.ndarray
+        Independent floating-point values with masked entries set to NaN.
+    """
     values = getattr(column, "value", column)
     try:
-        return np.asarray(values, dtype=float)
+        result = np.array(values, dtype=float, copy=True)
     except (TypeError, ValueError) as error:
         raise TypeError("Lightkurve columns must contain numerical values") from error
+    mask = np.ma.getmaskarray(column) | np.ma.getmaskarray(values)
+    return np.where(mask, np.nan, result)

@@ -46,7 +46,7 @@ def test_power_and_density_satisfy_parseval_relation():
     """Integrated power and power density should reproduce flux variance."""
     time, flux = _sine_series()
 
-    result = power_spectrum(time, flux, oversampling=3)
+    result = power_spectrum(time, flux, oversampling=1)
     variance = np.var(flux)
 
     assert np.sum(result.power) == pytest.approx(variance, rel=1e-12)
@@ -304,7 +304,7 @@ def test_super_nyquist_bins_do_not_change_physical_band_normalization():
         base.amplitude[base_index],
         rel=1e-9,
     )
-    assert np.sum(extended.power) > np.var(flux)
+    assert np.sum(extended.power) > np.sum(base.power)
 
 
 def test_under_resolved_frequency_grid_raises_descriptive_error():

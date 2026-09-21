@@ -130,6 +130,28 @@ and, when available, ``numax``.
 Network access is mocked in the ordinary test suite. Mimir's CI therefore does
 not depend on MAST availability or create repeated archive requests.
 
+Time conversion and masked measurements
+---------------------------------------
+
+:func:`mimir.lightcurve_to_timeseries` uses Astropy time arithmetic rather
+than the displayed ``Time.value``. Absolute ``Time`` columns are converted to
+elapsed times since JD 2451545.0 in their input time scale; their output no
+longer retains the original BKJD, BTJD, Unix, or JD display offset. Thus
+changing only the display format cannot change cadence, frequency, or PSD
+units. ``time_unit="s"`` performs an actual conversion to seconds. The
+origin is JD 2451545.0 in the input scale, not a conversion of all inputs to
+TT or TDB. UTC differences include leap seconds through Astropy arithmetic.
+
+``TimeDelta`` and time ``Quantity`` columns are converted directly without
+changing their origin. Unitless numerical columns are assumed to be days.
+The exposure-time fallback uses the same conversion to seconds before
+estimating cadence. Explicit exposure metadata still takes precedence.
+
+Masks on time, flux, and uncertainty columns are applied before computing
+the ppm normalization median. Masked values cannot re-enter as finite flux
+outliers. The input light curve is not modified, and the returned time
+series retains its input and removal counts.
+
 API
 ---
 

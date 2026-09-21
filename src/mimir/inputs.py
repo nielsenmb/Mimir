@@ -205,14 +205,25 @@ def _resolve_timeseries_input(
 
 
 def _one_dimensional_time(time: ArrayLike | None) -> np.ndarray:
-    """Return numerical one-dimensional sample times."""
+    """Return numerical sample times with their input mask intact.
+
+    Parameters
+    ----------
+    time : array-like or None
+        Sample times, optionally masked.
+
+    Returns
+    -------
+    numpy.ma.MaskedArray
+        One-dimensional values for validation by TimeSeries.
+    """
     try:
         values = np.asarray(time, dtype=float)
     except (TypeError, ValueError) as error:
         raise TypeError("time must contain numerical values") from error
     if values.ndim != 1:
         raise ValueError("time must be one-dimensional")
-    return values
+    return np.ma.array(values, mask=np.ma.getmaskarray(time), copy=False)
 
 
 def _reject_arguments(

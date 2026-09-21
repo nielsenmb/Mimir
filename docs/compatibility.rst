@@ -31,7 +31,11 @@ API:
 * uses inverse-variance-weighted centring when uncertainties are present;
 * reports a dimensionally consistent sinusoidal semi-amplitude;
 * keeps amplitude stable under frequency-grid oversampling;
-* normalizes using the physical one-sided band through Nyquist; and
+* fixes density normalization on positive ``1 / duration`` reference bins
+  through the median-cadence Nyquist estimate, independent of output spacing;
+* retains NumPy/Astropy masks during input preparation;
+* converts Lightkurve absolute times to elapsed time since JD 2451545.0 in
+  their input time scale, independent of display format; and
 * computes the sampling window directly from the Fourier transform of the
   observation mask.
 
