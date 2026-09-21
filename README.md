@@ -55,6 +55,14 @@ print(spectrum.frequency, spectrum.power_density)
 print(window.effective_frequency_spacing)
 ```
 
+Use an explicit regular grid when spectra for several targets must be directly
+comparable bin by bin:
+
+```python
+shared_frequency = np.arange(10.0, 5000.0, 0.1)  # uHz
+spectrum = power_spectrum(time_series=series, frequency=shared_frequency)
+```
+
 MAST access and basic Lightkurve reduction are available with the `mast`
 extra:
 

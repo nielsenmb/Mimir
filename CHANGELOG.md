@@ -11,6 +11,8 @@ project uses [Semantic Versioning](https://semver.org/).
 
 - Direct MAST target-name inputs for time-series, power-spectrum, and
   spectral-window workflows.
+- Explicit, regularly spaced frequency grids for power-spectrum calculation,
+  allowing multiple targets to be evaluated on identical frequency bins.
 
 ### Changed
 
